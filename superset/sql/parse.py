@@ -1373,6 +1373,22 @@ def extract_tables_from_statement(
             if isinstance(source, exp.Table) and not is_cte(source, scope)
         ]
 
+        # Use of `traverse_scope` doesn't always catch tables in subqueries within
+        # `VALUES` clauses, so we need to search for them explicitly.
+        # See https://github.com/apache/superset/issues/31599 for more details.
+        cte_names = {
+            cte.alias
+            for cte in statement.find_all(exp.CTE)
+            if isinstance(cte.alias, str)
+        }
+        for value in statement.find_all(exp.Values):
+            for table in value.find_all(exp.Table):
+                # If the table is not a CTE, it should be treated as a source.
+                # This is a heuristic, as we can't easily check for CTEs in scopes
+                # without traversing them.
+                if table.name not in cte_names:
+                    sources.append(table)
+
     return {
         Table(
             source.name,
