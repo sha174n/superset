@@ -76,10 +76,33 @@ def test_get_prequeries(mocker: MockerFixture) -> None:
     from superset.db_engine_specs.db2 import Db2EngineSpec
 
     database = mocker.MagicMock()
+    database.quote_identifier = lambda x: f'"{x}"'
 
     assert Db2EngineSpec.get_prequeries(database) == []
     assert Db2EngineSpec.get_prequeries(database, schema="my_schema") == [
         'set current_schema "my_schema"'
+    ]
+
+
+def test_get_prequeries_injection(mocker: MockerFixture) -> None:
+    """
+    Test the ``get_prequeries`` method with injection.
+    """
+    from superset.db_engine_specs.db2 import Db2EngineSpec
+
+    database = mocker.MagicMock()
+
+    # Mock quote_identifier behavior to mimic DB2 quoting (double quotes, escape double quotes)
+    def quote_identifier(s: str) -> str:
+        escaped = s.replace('"', '""')
+        return f'"{escaped}"'
+
+    database.quote_identifier = quote_identifier
+
+    schema = 'my_schema"; DROP TABLE foo; --'
+
+    assert Db2EngineSpec.get_prequeries(database, schema=schema) == [
+        'set current_schema "my_schema""; DROP TABLE foo; --"'
     ]
 
 

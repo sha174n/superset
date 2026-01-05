@@ -257,6 +257,11 @@ def test_get_prequeries(mocker: MockerFixture) -> None:
 
     database = mocker.MagicMock()
 
+    def quote_identifier(s: str) -> str:
+        return f"`{s.replace('`', '``')}`"
+
+    database.quote_identifier = quote_identifier
+
     assert DatabricksNativeEngineSpec.get_prequeries(database) == []
     assert DatabricksNativeEngineSpec.get_prequeries(database, schema="test") == [
         "USE SCHEMA `test`",
@@ -278,9 +283,23 @@ def test_get_prequeries(mocker: MockerFixture) -> None:
         "USE SCHEMA `hyphen-again`",
     ]
 
+
+def test_get_prequeries_injection(mocker: MockerFixture) -> None:
+    """
+    Test the ``get_prequeries`` method with injection.
+    """
+    from superset.db_engine_specs.databricks import DatabricksNativeEngineSpec
+
+    database = mocker.MagicMock()
+
+    def quote_identifier(s: str) -> str:
+        return f"`{s.replace('`', '``')}`"
+
+    database.quote_identifier = quote_identifier
+
     assert DatabricksNativeEngineSpec.get_prequeries(
-        database, catalog="`escaped-hyphen`", schema="`hyphen-escaped`"
+        database, catalog="cat`alog", schema="sche`ma"
     ) == [
-        "USE CATALOG `escaped-hyphen`",
-        "USE SCHEMA `hyphen-escaped`",
+        "USE CATALOG `cat``alog`",
+        "USE SCHEMA `sche``ma`",
     ]
