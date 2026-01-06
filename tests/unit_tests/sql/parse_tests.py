@@ -2511,6 +2511,28 @@ VALUES
   (1, 2)
             """.strip(),
         ),
+        (
+            "UPDATE some_table SET col1 = 1 WHERE col2 = 2",
+            {Table("some_table", "schema1", "catalog1"): "id = 42"},
+            """
+UPDATE some_table SET col1 = 1
+WHERE
+  some_table.id = 42 AND (
+    col2 = 2
+  )
+            """.strip(),
+        ),
+        (
+            "DELETE FROM some_table WHERE col2 = 2",
+            {Table("some_table", "schema1", "catalog1"): "id = 42"},
+            """
+DELETE FROM some_table
+WHERE
+  some_table.id = 42 AND (
+    col2 = 2
+  )
+            """.strip(),
+        ),
     ],
 )
 def test_rls_predicate_transformer(

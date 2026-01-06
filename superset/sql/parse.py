@@ -225,6 +225,15 @@ class RLSAsPredicateTransformer(RLSTransformer):
                 )
             join.set("on", predicate)
 
+        elif isinstance(node.parent, (exp.Update, exp.Delete)) and node.parent.this == node:
+            statement = node.parent
+            if where := statement.args.get("where"):
+                predicate = exp.And(
+                    this=predicate,
+                    expression=exp.Paren(this=where.this),
+                )
+            statement.set("where", exp.Where(this=predicate))
+
         return node
 
 
@@ -1372,6 +1381,12 @@ def extract_tables_from_statement(
             for source in scope.sources.values()
             if isinstance(source, exp.Table) and not is_cte(source, scope)
         ]
+
+        # For UPDATE and DELETE, the target table is not picked up by traverse_scope
+        if isinstance(statement, (exp.Update, exp.Delete)) and isinstance(
+            statement.this, exp.Table
+        ):
+            sources.append(statement.this)
 
     return {
         Table(
