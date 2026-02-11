@@ -22,6 +22,7 @@
 /* eslint no-param-reassign: [2, {"props": false}] */
 import d3 from 'd3';
 import PropTypes from 'prop-types';
+import { escape } from 'lodash';
 import { hierarchy, HierarchyNode } from 'd3-hierarchy';
 import {
   getNumberFormatter,
@@ -141,18 +142,6 @@ function getAncestors(d: PartitionNode): PartitionNode[] {
   }
 
   return ancestors;
-}
-
-function escapeHtml(text: unknown): string {
-  if (typeof text !== 'string') {
-    return String(text);
-  }
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }
 
 // This vis is based on
@@ -334,15 +323,15 @@ function Icicle(element: HTMLElement, props: IcicleProps): void {
             `background-color: ${n.color};'` +
             '></div>' +
             '</td>' +
-            `<td>${escapeHtml(getCategory(n.depth))}</td>` +
-            `<td>${escapeHtml(n.name)}</td>` +
-            `<td>${escapeHtml(n.disp)}</td>` +
+            `<td>${escape(getCategory(n.depth))}</td>` +
+            `<td>${escape(n.name)}</td>` +
+            `<td>${escape(String(n.disp))}</td>` +
             '</tr>';
         });
       } else {
         t +=
           '<thead><tr><td colspan="3">' +
-          `<strong>${escapeHtml(getCategory(d.depth))}</strong>` +
+          `<strong>${escape(getCategory(d.depth))}</strong>` +
           '</td></tr></thead><tbody>';
         t +=
           '<tr>' +
@@ -350,8 +339,8 @@ function Icicle(element: HTMLElement, props: IcicleProps): void {
           `<div style='border: thin solid grey; background-color: ${d.color};'` +
           '></div>' +
           '</td>' +
-          `<td>${escapeHtml(d.name)}</td>` +
-          `<td>${escapeHtml(d.disp)}</td>` +
+          `<td>${escape(d.name)}</td>` +
+          `<td>${escape(String(d.disp))}</td>` +
           '</tr>';
       }
       t += '</tbody></table>';
