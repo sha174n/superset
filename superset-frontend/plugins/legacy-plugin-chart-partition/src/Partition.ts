@@ -143,6 +143,18 @@ function getAncestors(d: PartitionNode): PartitionNode[] {
   return ancestors;
 }
 
+function escapeHtml(text: unknown): string {
+  if (typeof text !== 'string') {
+    return String(text);
+  }
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // This vis is based on
 // http://mbostock.github.io/d3/talk/20111018/partition.html
 function Icicle(element: HTMLElement, props: IcicleProps): void {
@@ -322,15 +334,15 @@ function Icicle(element: HTMLElement, props: IcicleProps): void {
             `background-color: ${n.color};'` +
             '></div>' +
             '</td>' +
-            `<td>${getCategory(n.depth)}</td>` +
-            `<td>${n.name}</td>` +
-            `<td>${n.disp}</td>` +
+            `<td>${escapeHtml(getCategory(n.depth))}</td>` +
+            `<td>${escapeHtml(n.name)}</td>` +
+            `<td>${escapeHtml(n.disp)}</td>` +
             '</tr>';
         });
       } else {
         t +=
           '<thead><tr><td colspan="3">' +
-          `<strong>${getCategory(d.depth)}</strong>` +
+          `<strong>${escapeHtml(getCategory(d.depth))}</strong>` +
           '</td></tr></thead><tbody>';
         t +=
           '<tr>' +
@@ -338,8 +350,8 @@ function Icicle(element: HTMLElement, props: IcicleProps): void {
           `<div style='border: thin solid grey; background-color: ${d.color};'` +
           '></div>' +
           '</td>' +
-          `<td>${d.name}</td>` +
-          `<td>${d.disp}</td>` +
+          `<td>${escapeHtml(d.name)}</td>` +
+          `<td>${escapeHtml(d.disp)}</td>` +
           '</tr>';
       }
       t += '</tbody></table>';
