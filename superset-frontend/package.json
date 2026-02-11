@@ -382,7 +382,7 @@
   },
   "peerDependencies": {
     "ace-builds": "^1.41.0",
-    "core-js": "^3.38.1",
+    "core-js": "^3.48.0",
     "handlebars": "^4.7.8",
     "react-ace": "^10.1.0",
     "regenerator-runtime": "^0.14.1"
@@ -392,7 +392,8 @@
     "npm": "^10.8.1"
   },
   "overrides": {
-    "core-js": "^3.38.1",
+    "@noble/hashes": "^1.8.0",
+    "core-js": "^3.48.0",
     "d3-color": "^3.1.0",
     "puppeteer": "^22.4.1",
     "remark-gfm": "^3.0.1",
