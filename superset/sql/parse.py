@@ -1373,6 +1373,21 @@ def extract_tables_from_statement(
             if isinstance(source, exp.Table) and not is_cte(source, scope)
         ]
 
+        # Traverse the scopes to collect CTEs.
+        ctes = {
+            cte.alias
+            for scope in traverse_scope(statement)
+            for cte in scope.ctes
+        }
+
+        # For `VALUES` clauses, `sqlglot`'s `traverse_scope` does not traverse them
+        # if they are top-level or not in a standard `FROM`/`JOIN`. We need to
+        # manually find tables.
+        for value in statement.find_all(exp.Values):
+            for table in value.find_all(exp.Table):
+                if table.name not in ctes:
+                    sources.append(table)
+
     return {
         Table(
             source.name,
