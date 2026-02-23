@@ -19,6 +19,10 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 
+import sqlglot
+from flask_babel import lazy_gettext as _
+from marshmallow import ValidationError
+from sqlglot import exp
 from sqlalchemy import and_, or_
 
 from superset import db
@@ -27,6 +31,49 @@ from superset.sql.parse import Table
 if TYPE_CHECKING:
     from superset.models.core import Database
     from superset.sql.parse import BaseSQLStatement
+
+
+def validate_rls_clause(clause: str) -> None:
+    """
+    Validate that the RLS clause does not contain any forbidden statements
+    such as subqueries, CTEs, or mutations.
+
+    :param clause: The RLS clause to validate
+    :raises ValidationError: If the clause is invalid
+    """
+    try:
+        # sqlglot.parse returns a list of expressions
+        parsed_expressions = sqlglot.parse(clause)
+    except Exception as ex:
+        raise ValidationError(_("Invalid SQL clause")) from ex
+
+    if len(parsed_expressions) > 1:
+        raise ValidationError(
+            _("RLS clause cannot contain multiple SQL statements")
+        )
+
+    # Check for forbidden node types
+    forbidden_types = (
+        exp.Subquery,
+        exp.Select,
+        exp.Values,
+        exp.Union,
+        exp.CTE,
+        exp.DDL,
+        exp.Command,
+        exp.Delete,
+        exp.Insert,
+        exp.Update,
+    )
+    if hasattr(exp, "Mutation"):
+        forbidden_types += (exp.Mutation,)
+
+    for parsed in parsed_expressions:
+        for node in parsed.walk():
+            if isinstance(node, forbidden_types):
+                raise ValidationError(
+                    _("RLS clause cannot contain subqueries, CTEs, or mutations")
+                )
 
 
 def apply_rls(

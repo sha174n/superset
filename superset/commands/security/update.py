@@ -19,6 +19,8 @@
 import logging
 from typing import Any, Optional
 
+from marshmallow import ValidationError
+
 from superset.commands.base import BaseCommand
 from superset.commands.exceptions import DatasourceNotFoundValidationError
 from superset.commands.security.exceptions import RLSRuleNotFoundError
@@ -27,6 +29,7 @@ from superset.connectors.sqla.models import RowLevelSecurityFilter, SqlaTable
 from superset.daos.security import RLSDAO
 from superset.extensions import db
 from superset.utils.decorators import transaction
+from superset.utils.rls import validate_rls_clause
 
 logger = logging.getLogger(__name__)
 
@@ -59,3 +62,5 @@ class UpdateRLSRuleCommand(BaseCommand):
             raise DatasourceNotFoundValidationError()
         self._properties["roles"] = roles
         self._properties["tables"] = tables
+        if "clause" in self._properties:
+            validate_rls_clause(self._properties["clause"])
