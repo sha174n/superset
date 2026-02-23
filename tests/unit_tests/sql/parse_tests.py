@@ -303,6 +303,28 @@ def test_extract_tables_select_from_values() -> None:
     assert extract_tables_from_sql("SELECT * FROM VALUES (13, 42)") == set()
 
 
+def test_extract_tables_values_clause() -> None:
+    """
+    Test extraction of tables from VALUES clauses.
+    """
+    # Vulnerability reproduction: VALUES with subquery
+    assert extract_tables_from_sql("VALUES ((SELECT * FROM admin_table))") == {
+        Table("admin_table")
+    }
+
+    # Mixed expressions
+    assert extract_tables_from_sql(
+        "VALUES (1, (SELECT count(*) FROM admin_table))"
+    ) == {Table("admin_table")}
+
+    # VALUES with CTE (should filter out CTE name 't' but find 'real_table')
+    # Wrapped in SELECT because sqlglot does not support top-level CTEs with VALUES
+    assert extract_tables_from_sql(
+        "WITH t AS (SELECT * FROM real_table) SELECT * FROM (VALUES ((SELECT * FROM t))) AS sub",
+        engine="postgresql",
+    ) == {Table("real_table")}
+
+
 def test_extract_tables_select_array() -> None:
     """
     Test that queries selecting arrays work as expected.
