@@ -22,8 +22,8 @@ from typing import Any, TYPE_CHECKING
 import sqlglot
 from flask_babel import lazy_gettext as _
 from marshmallow import ValidationError
-from sqlglot import exp
 from sqlalchemy import and_, or_
+from sqlglot import exp
 
 from superset import db
 from superset.sql.parse import Table
@@ -48,12 +48,10 @@ def validate_rls_clause(clause: str) -> None:
         raise ValidationError(_("Invalid SQL clause")) from ex
 
     if len(parsed_expressions) > 1:
-        raise ValidationError(
-            _("RLS clause cannot contain multiple SQL statements")
-        )
+        raise ValidationError(_("RLS clause cannot contain multiple SQL statements"))
 
     # Check for forbidden node types
-    forbidden_types = (
+    forbidden_types: tuple[type[exp.Expression], ...] = (
         exp.Subquery,
         exp.Select,
         exp.Values,

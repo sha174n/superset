@@ -19,8 +19,6 @@
 import logging
 from typing import Any, Optional
 
-from marshmallow import ValidationError
-
 from superset.commands.base import BaseCommand
 from superset.commands.exceptions import DatasourceNotFoundValidationError
 from superset.commands.security.exceptions import RLSRuleNotFoundError

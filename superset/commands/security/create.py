@@ -19,8 +19,6 @@
 import logging
 from typing import Any
 
-from marshmallow import ValidationError
-
 from superset.commands.base import BaseCommand
 from superset.commands.exceptions import DatasourceNotFoundValidationError
 from superset.commands.utils import populate_roles
@@ -55,4 +53,4 @@ class CreateRLSRuleCommand(BaseCommand):
             raise DatasourceNotFoundValidationError()
         self._properties["roles"] = roles
         self._properties["tables"] = tables
-        validate_rls_clause(self._properties.get("clause"))
+        validate_rls_clause(self._properties["clause"])
