@@ -1374,11 +1374,7 @@ def extract_tables_from_statement(
         ]
 
         # Traverse the scopes to collect CTEs.
-        ctes = {
-            cte.alias
-            for scope in traverse_scope(statement)
-            for cte in scope.ctes
-        }
+        ctes = {cte.alias for scope in traverse_scope(statement) for cte in scope.ctes}
 
         # For `VALUES` clauses, `sqlglot`'s `traverse_scope` does not traverse them
         # if they are top-level or not in a standard `FROM`/`JOIN`. We need to

@@ -320,7 +320,10 @@ def test_extract_tables_values_clause() -> None:
     # VALUES with CTE (should filter out CTE name 't' but find 'real_table')
     # Wrapped in SELECT because sqlglot does not support top-level CTEs with VALUES
     assert extract_tables_from_sql(
-        "WITH t AS (SELECT * FROM real_table) SELECT * FROM (VALUES ((SELECT * FROM t))) AS sub",
+        (
+            "WITH t AS (SELECT * FROM real_table) "
+            "SELECT * FROM (VALUES ((SELECT * FROM t))) AS sub"
+        ),
         engine="postgresql",
     ) == {Table("real_table")}
 
