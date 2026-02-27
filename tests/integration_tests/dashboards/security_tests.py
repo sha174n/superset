@@ -14,7 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import unittest
+import uuid
 import pytest
 from flask_appbuilder.security.sqla.models import Role
 from superset import db, security_manager
@@ -29,28 +29,24 @@ class TestDashboardChartsSecurity(SupersetTestCase):
         super().setUp()
         self.login("admin")
 
+        # Use unique suffix to prevent collisions
+        self.uid = uuid.uuid4().hex[:8]
+        self.role_name = f"TestSecurityRole_{self.uid}"
+        self.username = f"test_user_{self.uid}"
+
         # Ensure roles exist
         security_manager.sync_role_definitions()
 
-        # Create 2 datasets
         self.db = get_example_database()
 
-        # Check if tables exist and delete them if they do
-        self.dataset1 = db.session.query(SqlaTable).filter_by(table_name="test_table_1").one_or_none()
-        if self.dataset1:
-            db.session.delete(self.dataset1)
-        self.dataset2 = db.session.query(SqlaTable).filter_by(table_name="test_table_2").one_or_none()
-        if self.dataset2:
-            db.session.delete(self.dataset2)
-        db.session.commit()
-
+        # Create 2 datasets
         self.dataset1 = SqlaTable(
-            table_name="test_table_1",
+            table_name=f"test_table_1_{self.uid}",
             database=self.db,
             schema="public"
         )
         self.dataset2 = SqlaTable(
-            table_name="test_table_2",
+            table_name=f"test_table_2_{self.uid}",
             database=self.db,
             schema="public"
         )
@@ -64,14 +60,14 @@ class TestDashboardChartsSecurity(SupersetTestCase):
 
         # Create 2 charts
         self.chart1 = Slice(
-            slice_name="Chart 1",
+            slice_name=f"Chart 1 {self.uid}",
             datasource_type="table",
             datasource_id=self.dataset1.id,
             viz_type="table",
             params="{}"
         )
         self.chart2 = Slice(
-            slice_name="Chart 2",
+            slice_name=f"Chart 2 {self.uid}",
             datasource_type="table",
             datasource_id=self.dataset2.id,
             viz_type="table",
@@ -83,85 +79,114 @@ class TestDashboardChartsSecurity(SupersetTestCase):
 
         # Create Dashboard
         self.dashboard = Dashboard(
-            dashboard_title="Security Test Dashboard",
-            slug="security-test-dashboard",
+            dashboard_title=f"Security Test Dashboard {self.uid}",
+            slug=f"security-test-dashboard-{self.uid}",
             slices=[self.chart1, self.chart2],
             published=True
         )
         db.session.add(self.dashboard)
         db.session.commit()
 
-        # Create User with access to only Dataset 1 using a custom role
-        self.user = security_manager.find_user("test_user")
-        if not self.user:
-            self.user = self.create_user(
-                "test_user", "password", "Public", email="test_user@superset.org"
-            )
+        # Create User
+        self.user = self.create_user(
+            self.username, "password", "Public", email=f"{self.username}@superset.org"
+        )
 
         # Create a custom role
-        role_name = "TestSecurityRole"
-        self.role = security_manager.find_role(role_name)
-        if not self.role:
-            self.role = security_manager.add_role(role_name)
+        self.role = security_manager.add_role(self.role_name)
 
         # Add basic permissions to the role
         # We need "can read on Dashboard", "can read on Chart"
         read_dash = security_manager.find_permission_view_menu("can_read", "Dashboard")
         read_chart = security_manager.find_permission_view_menu("can_read", "Chart")
-        if read_dash and read_dash not in self.role.permissions:
+        if read_dash:
              self.role.permissions.append(read_dash)
-        if read_chart and read_chart not in self.role.permissions:
+        if read_chart:
              self.role.permissions.append(read_chart)
 
-        # Add permission to dataset1
+        # Add permission to dataset1 ONLY
         perm_view = security_manager.add_permission_view_menu(
             "datasource_access", self.dataset1.perm
         )
-        if perm_view not in self.role.permissions:
-            self.role.permissions.append(perm_view)
+        self.role.permissions.append(perm_view)
 
+        # Assign ONLY this role to the user (remove Public)
         self.user.roles = [self.role]
         db.session.commit()
 
     def tearDown(self):
         self.login("admin")
-        db.session.delete(self.dashboard)
-        db.session.delete(self.chart1)
-        db.session.delete(self.chart2)
-        db.session.delete(self.dataset1)
-        db.session.delete(self.dataset2)
-        if self.user:
-            db.session.delete(self.user)
-        if self.role:
-            db.session.delete(self.role)
+
+        # Re-fetch objects to ensure they are attached to the session before deletion
+        dashboard = db.session.query(Dashboard).filter_by(id=self.dashboard.id).first()
+        if dashboard:
+            db.session.delete(dashboard)
+
+        chart1 = db.session.query(Slice).filter_by(id=self.chart1.id).first()
+        if chart1:
+            db.session.delete(chart1)
+
+        chart2 = db.session.query(Slice).filter_by(id=self.chart2.id).first()
+        if chart2:
+            db.session.delete(chart2)
+
+        dataset1 = db.session.query(SqlaTable).filter_by(id=self.dataset1.id).first()
+        if dataset1:
+            db.session.delete(dataset1)
+
+        dataset2 = db.session.query(SqlaTable).filter_by(id=self.dataset2.id).first()
+        if dataset2:
+            db.session.delete(dataset2)
+
+        user = security_manager.find_user(self.username)
+        if user:
+            db.session.delete(user)
+
+        role = security_manager.find_role(self.role_name)
+        if role:
+            db.session.delete(role)
 
         db.session.commit()
         super().tearDown()
 
     def test_get_charts_vulnerability(self):
-        self.login("test_user", "password")
+        self.login(self.username, "password")
 
-        uri = f"api/v1/dashboard/{self.dashboard.id}/charts"
+        # Re-fetch dashboard ID to ensure session consistency
+        dashboard = db.session.query(Dashboard).filter_by(id=self.dashboard.id).one()
+
+        uri = f"api/v1/dashboard/{dashboard.id}/charts"
         rv = self.client.get(uri)
-        assert rv.status_code == 200
+        assert rv.status_code == 200, f"Request failed with {rv.status}"
 
         data = rv.json["result"]
         chart_ids = [c["id"] for c in data]
 
-        assert self.chart1.id in chart_ids
+        # Re-fetch chart IDs to avoid DetachedInstanceError
+        chart1_id = self.chart1.id
+        chart2_id = self.chart2.id
+
+        assert chart1_id in chart_ids, "User should see Chart 1"
         # The user should NOT have access to chart 2 (dataset 2)
-        assert self.chart2.id not in chart_ids
+        assert chart2_id not in chart_ids, "IDOR: User accessed metadata for Chart 2 without permission"
 
     def test_get_datasets_vulnerability(self):
-        self.login("test_user", "password")
+        self.login(self.username, "password")
 
-        uri = f"api/v1/dashboard/{self.dashboard.id}/datasets"
+        # Re-fetch dashboard ID to ensure session consistency
+        dashboard = db.session.query(Dashboard).filter_by(id=self.dashboard.id).one()
+
+        uri = f"api/v1/dashboard/{dashboard.id}/datasets"
         rv = self.client.get(uri)
         assert rv.status_code == 200
 
         data = rv.json["result"]
         dataset_ids = [d["id"] for d in data]
 
-        assert self.dataset1.id in dataset_ids
+        # Re-fetch dataset IDs to avoid DetachedInstanceError
+        dataset1_id = self.dataset1.id
+        dataset2_id = self.dataset2.id
+
+        assert dataset1_id in dataset_ids, "User should see Dataset 1"
         # The user should NOT have access to dataset 2
-        assert self.dataset2.id not in dataset_ids
+        assert dataset2_id not in dataset_ids, "IDOR: User accessed metadata for Dataset 2 without permission"

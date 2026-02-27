@@ -39,7 +39,7 @@ from marshmallow import ValidationError
 from werkzeug.wrappers import Response as WerkzeugResponse
 from werkzeug.wsgi import FileWrapper
 
-from superset import db, security_manager
+from superset import db, is_feature_enabled, security_manager
 from superset.charts.schemas import ChartEntityResponseSchema
 from superset.commands.dashboard.copy import CopyDashboardCommand
 from superset.commands.dashboard.create import CreateDashboardCommand
@@ -570,9 +570,27 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
                 slices_by_datasource[slc.datasource_id].add(slc)
 
             datasets = []
+            # Check for DASHBOARD_RBAC access or Guest User access
+            # If the user has access to the dashboard via RBAC or Guest Token,
+            # they should have access to the datasets in the dashboard
+            has_dashboard_access = (
+                security_manager.is_admin() or security_manager.is_owner(dashboard)
+            )
+            if not has_dashboard_access:
+                if security_manager.is_guest_user():
+                    has_dashboard_access = security_manager.has_guest_access(dashboard)
+                elif is_feature_enabled("DASHBOARD_RBAC") and dashboard.roles:
+                    has_dashboard_access = dashboard.published and (
+                        {role.id for role in dashboard.roles}
+                        & {role.id for role in security_manager.get_user_roles()}
+                    )
+
             for _, slices in slices_by_datasource.items():
                 datasource = next(iter(slices)).datasource
-                if datasource and security_manager.can_access_datasource(datasource):
+                if datasource and (
+                    has_dashboard_access
+                    or security_manager.can_access_datasource(datasource)
+                ):
                     datasets.append(datasource.data_for_slices(list(slices)))
 
             result = [
@@ -684,14 +702,32 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
               $ref: '#/components/responses/404'
         """
         try:
+            dashboard = DashboardDAO.get_by_id_or_slug(id_or_slug)
             charts = DashboardDAO.get_charts_for_dashboard(id_or_slug)
-            # Filter charts based on permissions
-            charts = [
-                chart
-                for chart in charts
-                if chart.datasource
-                and security_manager.can_access_datasource(chart.datasource)
-            ]
+
+            # Check for DASHBOARD_RBAC access or Guest User access
+            # If the user has access to the dashboard via RBAC or Guest Token,
+            # they should have access to the charts in the dashboard
+            has_dashboard_access = (
+                security_manager.is_admin() or security_manager.is_owner(dashboard)
+            )
+            if not has_dashboard_access:
+                if security_manager.is_guest_user():
+                    has_dashboard_access = security_manager.has_guest_access(dashboard)
+                elif is_feature_enabled("DASHBOARD_RBAC") and dashboard.roles:
+                    has_dashboard_access = dashboard.published and (
+                        {role.id for role in dashboard.roles}
+                        & {role.id for role in security_manager.get_user_roles()}
+                    )
+
+            # Filter charts based on permissions if no explicit dashboard access
+            if not has_dashboard_access:
+                charts = [
+                    chart
+                    for chart in charts
+                    if chart.datasource
+                    and security_manager.can_access_datasource(chart.datasource)
+                ]
             result = [self.chart_entity_response_schema.dump(chart) for chart in charts]
             return self.response(200, result=result)
         except DashboardAccessDeniedError:
