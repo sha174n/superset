@@ -16,6 +16,7 @@
 # under the License.
 import unittest
 import pytest
+from flask_appbuilder.security.sqla.models import Role
 from superset import db, security_manager
 from superset.models.dashboard import Dashboard
 from superset.models.slice import Slice
@@ -90,25 +91,36 @@ class TestDashboardChartsSecurity(SupersetTestCase):
         db.session.add(self.dashboard)
         db.session.commit()
 
-        # Create User with access to only Dataset 1
-        # Check if user exists
+        # Create User with access to only Dataset 1 using a custom role
         self.user = security_manager.find_user("test_user")
         if not self.user:
             self.user = self.create_user(
-                "test_user", "password", "Gamma", email="test_user@superset.org"
+                "test_user", "password", "Public", email="test_user@superset.org"
             )
 
-        # Grant access to Dataset 1
-        gamma_role = security_manager.find_role("Gamma")
-        if not gamma_role:
-             # Create Gamma role if it doesn't exist (though sync_role_definitions should have created it)
-             gamma_role = security_manager.add_role("Gamma")
+        # Create a custom role
+        role_name = "TestSecurityRole"
+        self.role = security_manager.find_role(role_name)
+        if not self.role:
+            self.role = security_manager.add_role(role_name)
 
+        # Add basic permissions to the role
+        # We need "can read on Dashboard", "can read on Chart"
+        read_dash = security_manager.find_permission_view_menu("can_read", "Dashboard")
+        read_chart = security_manager.find_permission_view_menu("can_read", "Chart")
+        if read_dash and read_dash not in self.role.permissions:
+             self.role.permissions.append(read_dash)
+        if read_chart and read_chart not in self.role.permissions:
+             self.role.permissions.append(read_chart)
+
+        # Add permission to dataset1
         perm_view = security_manager.add_permission_view_menu(
             "datasource_access", self.dataset1.perm
         )
-        if perm_view not in gamma_role.permissions:
-            gamma_role.permissions.append(perm_view)
+        if perm_view not in self.role.permissions:
+            self.role.permissions.append(perm_view)
+
+        self.user.roles = [self.role]
         db.session.commit()
 
     def tearDown(self):
@@ -120,14 +132,8 @@ class TestDashboardChartsSecurity(SupersetTestCase):
         db.session.delete(self.dataset2)
         if self.user:
             db.session.delete(self.user)
-
-        gamma_role = security_manager.find_role("Gamma")
-        if hasattr(self, 'dataset1') and self.dataset1:
-             perm_view = security_manager.find_permission_view_menu(
-                "datasource_access", self.dataset1.perm
-             )
-             if perm_view and perm_view in gamma_role.permissions:
-                 gamma_role.permissions.remove(perm_view)
+        if self.role:
+            db.session.delete(self.role)
 
         db.session.commit()
         super().tearDown()
