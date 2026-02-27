@@ -689,7 +689,8 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
             charts = [
                 chart
                 for chart in charts
-                if security_manager.can_access_datasource(chart.datasource)
+                if chart.datasource
+                and security_manager.can_access_datasource(chart.datasource)
             ]
             result = [self.chart_entity_response_schema.dump(chart) for chart in charts]
             return self.response(200, result=result)
