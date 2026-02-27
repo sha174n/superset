@@ -102,10 +102,9 @@ RATELIMIT_ENABLED = False
 
 
 CACHE_CONFIG = {
-    "CACHE_TYPE": "RedisCache",
+    "CACHE_TYPE": "SimpleCache",
     "CACHE_DEFAULT_TIMEOUT": int(timedelta(minutes=1).total_seconds()),
     "CACHE_KEY_PREFIX": "superset_cache",
-    "CACHE_REDIS_URL": f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_CACHE_DB}",
 }
 
 DATA_CACHE_CONFIG = {

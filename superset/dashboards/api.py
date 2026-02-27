@@ -39,7 +39,7 @@ from marshmallow import ValidationError
 from werkzeug.wrappers import Response as WerkzeugResponse
 from werkzeug.wsgi import FileWrapper
 
-from superset import db
+from superset import db, security_manager
 from superset.charts.schemas import ChartEntityResponseSchema
 from superset.commands.dashboard.copy import CopyDashboardCommand
 from superset.commands.dashboard.create import CreateDashboardCommand
@@ -561,8 +561,20 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
             404:
               $ref: '#/components/responses/404'
         """
+        from collections import defaultdict
+
         try:
-            datasets = DashboardDAO.get_datasets_for_dashboard(id_or_slug)
+            dashboard = DashboardDAO.get_by_id_or_slug(id_or_slug)
+            slices_by_datasource: dict[int, set[Any]] = defaultdict(set)
+            for slc in dashboard.slices:
+                slices_by_datasource[slc.datasource_id].add(slc)
+
+            datasets = []
+            for _, slices in slices_by_datasource.items():
+                datasource = next(iter(slices)).datasource
+                if datasource and security_manager.can_access_datasource(datasource):
+                    datasets.append(datasource.data_for_slices(list(slices)))
+
             result = [
                 self.dashboard_dataset_schema.dump(dataset) for dataset in datasets
             ]
@@ -673,6 +685,12 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
         """
         try:
             charts = DashboardDAO.get_charts_for_dashboard(id_or_slug)
+            # Filter charts based on permissions
+            charts = [
+                chart
+                for chart in charts
+                if security_manager.can_access_datasource(chart.datasource)
+            ]
             result = [self.chart_entity_response_schema.dump(chart) for chart in charts]
             return self.response(200, result=result)
         except DashboardAccessDeniedError:
