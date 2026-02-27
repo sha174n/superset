@@ -17,15 +17,24 @@
 
 
 import logging
+from functools import partial
 from typing import Any
+
+from marshmallow import ValidationError
 
 from superset.commands.base import BaseCommand
 from superset.commands.exceptions import DatasourceNotFoundValidationError
+from superset.commands.security.exceptions import (
+    RLSRuleCreateFailedError,
+    RLSRuleInvalidError,
+)
 from superset.commands.utils import populate_roles
 from superset.connectors.sqla.models import SqlaTable
+from superset.daos.dataset import DatasetDAO
 from superset.daos.security import RLSDAO
-from superset.extensions import db
-from superset.utils.decorators import transaction
+from superset.exceptions import SupersetParseError, SupersetSecurityException
+from superset.models.helpers import validate_adhoc_subquery
+from superset.utils.decorators import on_error, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +45,50 @@ class CreateRLSRuleCommand(BaseCommand):
         self._tables = self._properties.get("tables", [])
         self._roles = self._properties.get("roles", [])
 
-    @transaction()
+    @transaction(on_error=partial(on_error, reraise=RLSRuleCreateFailedError))
     def run(self) -> Any:
         self.validate()
         return RLSDAO.create(attributes=self._properties)
 
     def validate(self) -> None:
+        exceptions: list[ValidationError] = []
         roles = populate_roles(self._roles)
-        tables = (
-            db.session.query(SqlaTable)
-            .filter(SqlaTable.id.in_(self._tables))  # type: ignore[attr-defined]
-            .all()
-        )
+        tables: list[SqlaTable] = DatasetDAO.find_by_ids(self._tables)
+
         if len(tables) != len(self._tables):
-            raise DatasourceNotFoundValidationError()
+            exceptions.append(DatasourceNotFoundValidationError())
+
         self._properties["roles"] = roles
+        if clause := self._properties.get("clause"):
+            # If no tables are associated, perform a baseline check with no specific engine
+            if not tables:
+                try:
+                    from superset.extensions import db
+                    from superset.models.core import Database
+                    # Create a dummy shell for validation
+                    validate_adhoc_subquery(
+                        clause,
+                        database=Database(),
+                        catalog=None,
+                        default_schema="public",
+                        engine="base",
+                    )
+                except (SupersetSecurityException, SupersetParseError) as ex:
+                    exceptions.append(ValidationError(ex.message))
+            
+            for table in tables:
+                try:
+                    validate_adhoc_subquery(
+                        clause,
+                        database=table.database,
+                        catalog=table.catalog,
+                        default_schema=table.schema,
+                        engine=table.database.db_engine_spec.engine,
+                    )
+                except (SupersetSecurityException, SupersetParseError) as ex:
+                    exceptions.append(ValidationError(ex.message))
+
+        if exceptions:
+            raise RLSRuleInvalidError(exceptions=exceptions)
+
         self._properties["tables"] = tables

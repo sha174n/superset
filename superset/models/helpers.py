@@ -44,6 +44,7 @@ import numpy as np
 import pandas as pd
 import pytz
 import sqlalchemy as sa
+import sqlglot.expressions as exp
 import yaml
 from flask import current_app as app, g
 from flask_appbuilder import Model

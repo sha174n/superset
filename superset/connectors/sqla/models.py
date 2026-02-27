@@ -98,6 +98,7 @@ from superset.models.helpers import (
     AuditMixinNullable,
     CertificationMixin,
     ExploreMixin,
+    validate_adhoc_subquery,
     ImportExportMixin,
     QueryResult,
     SQLA_QUERY_KEYS,
@@ -755,9 +756,18 @@ class BaseDatasource(
         filter_groups: dict[Union[int, str], list[TextClause]] = defaultdict(list)
         try:
             for filter_ in security_manager.get_rls_filters(self):
-                clause = self.text(
-                    f"({template_processor.process_template(filter_.clause)})"
+                clause = filter_.clause
+                # Validate that the filter clause doesnt be malicious
+                # or other SQL injection vectors.
+                validate_adhoc_subquery(
+                    clause,
+                    database=self.database,
+                    catalog=self.catalog,
+                    default_schema=self.schema,
+                    engine=self.database.db_engine_spec.engine,
                 )
+
+                clause = self.text(f"({template_processor.process_template(clause)})")
                 if filter_.group_key:
                     filter_groups[filter_.group_key].append(clause)
                 else:
