@@ -580,9 +580,12 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
                 if security_manager.is_guest_user():
                     has_dashboard_access = security_manager.has_guest_access(dashboard)
                 elif is_feature_enabled("DASHBOARD_RBAC") and dashboard.roles:
-                    has_dashboard_access = dashboard.published and (
-                        {role.id for role in dashboard.roles}
-                        & {role.id for role in security_manager.get_user_roles()}
+                    has_dashboard_access = bool(
+                        dashboard.published
+                        and (
+                            {role.id for role in dashboard.roles}
+                            & {role.id for role in security_manager.get_user_roles()}
+                        )
                     )
 
             for _, slices in slices_by_datasource.items():
@@ -715,9 +718,12 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
                 if security_manager.is_guest_user():
                     has_dashboard_access = security_manager.has_guest_access(dashboard)
                 elif is_feature_enabled("DASHBOARD_RBAC") and dashboard.roles:
-                    has_dashboard_access = dashboard.published and (
-                        {role.id for role in dashboard.roles}
-                        & {role.id for role in security_manager.get_user_roles()}
+                    has_dashboard_access = bool(
+                        dashboard.published
+                        and (
+                            {role.id for role in dashboard.roles}
+                            & {role.id for role in security_manager.get_user_roles()}
+                        )
                     )
 
             # Filter charts based on permissions if no explicit dashboard access
