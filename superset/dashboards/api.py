@@ -574,7 +574,9 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
             # If the user has access to the dashboard via RBAC or Guest Token,
             # they should have access to the datasets in the dashboard
             has_dashboard_access = (
-                security_manager.is_admin() or security_manager.is_owner(dashboard)
+                security_manager.is_admin()
+                or security_manager.is_owner(dashboard)
+                or (not dashboard.roles and dashboard.published)
             )
             if not has_dashboard_access:
                 if security_manager.is_guest_user():
@@ -712,7 +714,9 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
             # If the user has access to the dashboard via RBAC or Guest Token,
             # they should have access to the charts in the dashboard
             has_dashboard_access = (
-                security_manager.is_admin() or security_manager.is_owner(dashboard)
+                security_manager.is_admin()
+                or security_manager.is_owner(dashboard)
+                or (not dashboard.roles and dashboard.published)
             )
             if not has_dashboard_access:
                 if security_manager.is_guest_user():
