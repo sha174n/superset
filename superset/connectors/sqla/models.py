@@ -758,7 +758,7 @@ class BaseDatasource(
             for filter_ in security_manager.get_rls_filters(self):
                 # Process template to get the actual clause to be used
                 clause_text = template_processor.process_template(filter_.clause)
-                # Validate the RLS clause to prevent subquery injection (SEC-116)
+                # Validate the RLS clause to prevent subqueries
                 # We use validate_rls_clause for validation but discard its
                 # formatted output to preserve original case/formatting in the query.
                 validate_rls_clause(
