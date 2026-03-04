@@ -17,13 +17,7 @@
 
 from flask_babel import lazy_gettext as _
 
-from superset.commands.exceptions import (
-    CommandException,
-    CommandInvalidError,
-    CreateFailedError,
-    DeleteFailedError,
-    UpdateFailedError,
-)
+from superset.commands.exceptions import CommandException, DeleteFailedError
 
 
 class RLSRuleNotFoundError(CommandException):
@@ -33,15 +27,3 @@ class RLSRuleNotFoundError(CommandException):
 
 class RuleDeleteFailedError(DeleteFailedError):
     message = _("RLS rules could not be deleted.")
-
-
-class RLSRuleInvalidError(CommandInvalidError):
-    message = _("RLS rule parameters are invalid.")
-
-
-class RLSRuleCreateFailedError(CreateFailedError):
-    message = _("RLS rule could not be created.")
-
-
-class RLSRuleUpdateFailedError(UpdateFailedError):
-    message = _("RLS rule could not be updated.")

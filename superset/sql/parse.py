@@ -878,34 +878,14 @@ class SQLStatement(BaseSQLStatement[exp.Expression]):
 
         :return: True if the statement has a subquery.
         """
-        # catch nested subqueries
-        if bool(self._parsed.find(exp.Subquery)):
-            return True
-
-        if isinstance(self._parsed, (exp.Update, exp.Delete, exp.Insert, exp.Merge)):
-            return True
-
-        # recursive walker to catch all forms of sub-statements
-        for node in self._parsed.walk():
-            # don't catch the root Select/Union etc.
-            if node == self._parsed:
-                continue
-            if isinstance(
-                node,
-                (
-                    exp.Select,
-                    exp.Union,
-                    exp.Except,
-                    exp.Intersect,
-                    exp.Update,
-                    exp.Delete,
-                    exp.Insert,
-                    exp.Merge,
-                ),
-            ):
-                return True
-
-        return False
+        return bool(self._parsed.find(exp.Subquery)) or (
+            isinstance(self._parsed, exp.Select)
+            and any(
+                isinstance(expression, exp.Select)
+                for expression in self._parsed.walk()
+                if expression != self._parsed
+            )
+        )
 
     def parse_predicate(self, predicate: str) -> exp.Expression:
         """
