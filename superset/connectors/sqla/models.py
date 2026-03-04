@@ -95,6 +95,7 @@ from superset.jinja_context import (
 from superset.models.annotations import Annotation
 from superset.models.core import Database
 from superset.models.helpers import (
+    validate_rls_clause,
     AuditMixinNullable,
     CertificationMixin,
     ExploreMixin,
@@ -755,9 +756,16 @@ class BaseDatasource(
         filter_groups: dict[Union[int, str], list[TextClause]] = defaultdict(list)
         try:
             for filter_ in security_manager.get_rls_filters(self):
-                clause = self.text(
-                    f"({template_processor.process_template(filter_.clause)})"
+                # Process template to get the actual clause to be used
+                clause_text = template_processor.process_template(filter_.clause)
+                # Validate the RLS clause to prevent subquery injection (SEC-116)
+                # We use validate_rls_clause for validation but discard its
+                # formatted output to preserve original case/formatting in the query.
+                validate_rls_clause(
+                    clause_text,
+                    engine=self.database.backend,
                 )
+                clause = self.text(f"({clause_text})")
                 if filter_.group_key:
                     filter_groups[filter_.group_key].append(clause)
                 else:
@@ -765,9 +773,13 @@ class BaseDatasource(
 
             if is_feature_enabled("EMBEDDED_SUPERSET"):
                 for rule in security_manager.get_guest_rls_filters(self):
-                    clause = self.text(
-                        f"({template_processor.process_template(rule['clause'])})"
+                    # Also validate guest RLS filters
+                    clause_text = template_processor.process_template(rule["clause"])
+                    validate_rls_clause(
+                        clause_text,
+                        engine=self.database.backend,
                     )
+                    clause = self.text(f"({clause_text})")
                     all_filters.append(clause)
 
             grouped_filters = [or_(*clauses) for clauses in filter_groups.values()]

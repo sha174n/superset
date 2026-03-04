@@ -17,15 +17,24 @@
 
 
 import logging
+from functools import partial
 from typing import Any
 
+from marshmallow import ValidationError
+
+from superset import db
 from superset.commands.base import BaseCommand
 from superset.commands.exceptions import DatasourceNotFoundValidationError
+from superset.commands.security.exceptions import (
+    RLSRuleCreateFailedError,
+    RLSRuleInvalidError,
+)
 from superset.commands.utils import populate_roles
 from superset.connectors.sqla.models import SqlaTable
+from superset.daos.dataset import DatasetDAO
 from superset.daos.security import RLSDAO
-from superset.extensions import db
-from superset.utils.decorators import transaction
+from superset.models.helpers import validate_rls_clause
+from superset.utils.decorators import on_error, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +45,57 @@ class CreateRLSRuleCommand(BaseCommand):
         self._tables = self._properties.get("tables", [])
         self._roles = self._properties.get("roles", [])
 
-    @transaction()
+    @transaction(on_error=partial(on_error, reraise=RLSRuleCreateFailedError))
     def run(self) -> Any:
         self.validate()
         return RLSDAO.create(attributes=self._properties)
 
     def validate(self) -> None:
+        exceptions: list[ValidationError] = []
+        self._validate_name_uniqueness(exceptions)
         roles = populate_roles(self._roles)
-        tables = (
-            db.session.query(SqlaTable)
-            .filter(SqlaTable.id.in_(self._tables))  # type: ignore[attr-defined]
-            .all()
-        )
+        tables: list[SqlaTable] = DatasetDAO.find_by_ids(self._tables)
+
         if len(tables) != len(self._tables):
             raise DatasourceNotFoundValidationError()
+
+        self._validate_clause(tables, exceptions)
+
+        if exceptions:
+            raise RLSRuleInvalidError(exceptions=exceptions)
+
         self._properties["roles"] = roles
         self._properties["tables"] = tables
+
+    def _validate_name_uniqueness(self, exceptions: list[ValidationError]) -> None:
+        from flask_babel import lazy_gettext as _
+
+        from superset.connectors.sqla.models import RowLevelSecurityFilter
+
+        if name := self._properties.get("name"):
+            if (
+                db.session.query(RowLevelSecurityFilter)
+                .filter_by(name=name)
+                .one_or_none()
+            ):
+                exceptions.append(
+                    ValidationError(_("Name must be unique"), field_name="name")
+                )
+
+    def _validate_clause(
+        self, tables: list[SqlaTable], exceptions: list[ValidationError]
+    ) -> None:
+        from superset.exceptions import SupersetSecurityException
+
+        if clause := self._properties.get("clause"):
+            try:
+                if not tables:
+                    validate_rls_clause(clause, engine="base")
+
+                for table in tables:
+                    validate_rls_clause(
+                        clause,
+                        engine=table.database.db_engine_spec.engine,
+                    )
+            except SupersetSecurityException as ex:
+                exceptions.append(ValidationError(ex.message, field_name="clause"))

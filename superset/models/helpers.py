@@ -87,7 +87,6 @@ from superset.exceptions import (
 )
 from superset.extensions import feature_flag_manager
 from superset.jinja_context import BaseTemplateProcessor
-from superset.sql.parse import sanitize_clause, SQLScript, SQLStatement
 from superset.superset_typing import (
     AdhocMetric,
     Column as ColumnTyping,
@@ -191,6 +190,8 @@ def validate_adhoc_subquery(
     default_schema: str,
     engine: str,
 ) -> str:
+    from superset.sql.parse import SQLStatement
+
     """
     Check if adhoc SQL contains sub-queries or nested sub-queries with table.
 
@@ -217,6 +218,32 @@ def validate_adhoc_subquery(
 
     return parsed_statement.format()
 
+
+def validate_rls_clause(
+    sql: str,
+    engine: str,
+) -> str:
+    """
+    Ensure the RLS clause is a valid SQL fragment.
+    This is a lighter validation than validate_adhoc_subquery as it
+    is intended for administrator-defined security rules.
+
+    :param sql: RLS clause expression
+    :raise SupersetParseError if sql is syntactically invalid
+    """
+    from superset.sql.parse import SQLStatement
+
+    # We just need to ensure it parses correctly as a predicate/expression
+    parsed_statement = SQLStatement(sql, engine)
+    if parsed_statement.has_subquery():
+        raise SupersetSecurityException(
+            SupersetError(
+                error_type=SupersetErrorType.ADHOC_SUBQUERY_NOT_ALLOWED_ERROR,
+                message=_("Row level security filters cannot contain sub-queries."),
+                level=ErrorLevel.ERROR,
+            )
+        )
+    return sql
 
 def json_to_dict(json_str: str) -> dict[Any, Any]:
     if json_str:
@@ -927,6 +954,8 @@ class ExploreMixin:  # pylint: disable=too-many-public-methods
                 schema,
                 engine,
             )
+            from superset.sql.parse import sanitize_clause
+
             try:
                 expression = sanitize_clause(expression, engine)
             except QueryClauseValidationException as ex:
@@ -2012,6 +2041,8 @@ class ExploreMixin:  # pylint: disable=too-many-public-methods
                     )
                 ) from ex
 
+        from superset.sql.parse import SQLScript
+
         script = SQLScript(sql, engine=self.db_engine_spec.engine)
         if len(script.statements) > 1:
             raise QueryObjectValidationError(
@@ -2037,6 +2068,8 @@ class ExploreMixin:  # pylint: disable=too-many-public-methods
         prevent RLS bypass.
         """
         from_sql = self.get_rendered_sql(template_processor) + "\n"
+        from superset.sql.parse import SQLScript
+
         parsed_script = SQLScript(from_sql, engine=self.db_engine_spec.engine)
         if parsed_script.has_mutation():
             raise QueryObjectValidationError(
@@ -2414,7 +2447,7 @@ class ExploreMixin:  # pylint: disable=too-many-public-methods
                     self.dttm_sql_literal(end_dttm, time_col)
                 )
             )
-        return and_(*l)
+        return and_(True, *l)
 
     def values_for_column(  # pylint: disable=too-many-locals
         self,

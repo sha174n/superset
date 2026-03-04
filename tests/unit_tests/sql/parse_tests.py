@@ -3134,3 +3134,35 @@ def test_backtick_invalid_sql_still_fails() -> None:
     sql = "SELECT * FROM `table` WHERE"
     with pytest.raises(SupersetParseError):
         SQLScript(sql, "base")
+
+def test_validate_rls_clause_success():
+    from superset.models.helpers import validate_rls_clause
+    # Valid RLS clauses should not raise exceptions
+    validate_rls_clause("department_id = 5", "postgresql")
+    validate_rls_clause("user_id = current_user_id()", "postgresql")
+    validate_rls_clause("tenant_id IN (1, 2, 3)", "postgresql")
+
+
+def test_validate_rls_clause_subquery():
+    from superset.models.helpers import validate_rls_clause
+    from superset.exceptions import SupersetSecurityException
+    # Subqueries should be blocked
+    with pytest.raises(SupersetSecurityException):
+        validate_rls_clause("id IN (SELECT id FROM other_table)", "postgresql")
+
+    with pytest.raises(SupersetSecurityException):
+        validate_rls_clause("1=1 OR (SELECT count(*) FROM users) > 0", "postgresql")
+
+
+def test_validate_rls_clause_scenarios():
+    from superset.models.helpers import validate_rls_clause
+    from superset.exceptions import SupersetSecurityException
+    # CTEs with subqueries should be blocked
+    with pytest.raises(SupersetSecurityException):
+        validate_rls_clause(
+            "WITH cte AS (SELECT 1) SELECT * FROM cte", "postgresql"
+        )
+
+    # DML mutations should be blocked
+    with pytest.raises(SupersetSecurityException):
+        validate_rls_clause("DELETE FROM users", "postgresql")
