@@ -21,7 +21,8 @@ import { css, useTheme } from '@apache-superset/core/ui';
 import { Button, Divider, Dropdown } from '@superset-ui/core/components';
 import { Menu, MenuItemType } from '@superset-ui/core/components/Menu';
 import { Icons } from '@superset-ui/core/components/Icons';
-import { commands, menus } from 'src/core';
+import { commands } from 'src/core';
+import ExtensionsManager from 'src/extensions/ExtensionsManager';
 
 export interface PanelToolbarProps {
   viewId: string;
@@ -35,16 +36,20 @@ const PanelToolbar = ({
   defaultSecondaryActions,
 }: PanelToolbarProps) => {
   const theme = useTheme();
-  const menu = menus.getMenu(viewId);
+  const contributions =
+    ExtensionsManager.getInstance().getMenuContributions(viewId);
 
-  const primaryItems = menu?.primary || [];
-  const secondaryItems = menu?.secondary || [];
+  const primaryContributions = contributions?.primary || [];
+  const secondaryContributions = contributions?.secondary || [];
 
   const extensionPrimaryActions = useMemo(
     () =>
-      primaryItems
-        .map(item => {
-          const command = commands.getCommand(item.command)!;
+      primaryContributions
+        .map(contribution => {
+          const command =
+            ExtensionsManager.getInstance().getCommandContribution(
+              contribution.command,
+            )!;
           if (!command?.icon) {
             return null;
           }
@@ -55,8 +60,8 @@ const PanelToolbar = ({
 
           return (
             <Button
-              key={item.view}
-              onClick={() => commands.executeCommand(command?.id)}
+              key={contribution.view}
+              onClick={() => commands.executeCommand(command?.command)}
               tooltip={command?.description ?? command?.title}
               icon={<Icon iconSize="m" />}
               buttonSize="small"
@@ -67,27 +72,30 @@ const PanelToolbar = ({
           );
         })
         .filter(Boolean),
-    [primaryItems],
+    [primaryContributions],
   );
 
   const secondaryActions = useMemo(
     () =>
-      secondaryItems
-        .map(item => {
-          const command = commands.getCommand(item.command)!;
+      secondaryContributions
+        .map(contribution => {
+          const command =
+            ExtensionsManager.getInstance().getCommandContribution(
+              contribution.command,
+            )!;
           if (!command) {
             return null;
           }
           return {
-            key: command.id,
+            key: command.command,
             label: command.title,
             title: command.description,
-            onClick: () => commands.executeCommand(command.id),
+            onClick: () => commands.executeCommand(command.command),
           } as MenuItemType;
         })
         .filter(Boolean)
         .concat(defaultSecondaryActions || []),
-    [secondaryItems, defaultSecondaryActions],
+    [secondaryContributions, defaultSecondaryActions],
   );
 
   const hasPrimaryActions =

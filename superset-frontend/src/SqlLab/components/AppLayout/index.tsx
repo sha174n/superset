@@ -22,7 +22,7 @@ import type { SqlLabRootState } from 'src/SqlLab/types';
 import { css, styled } from '@apache-superset/core';
 import { useComponentDidUpdate } from '@superset-ui/core';
 import { Grid } from '@superset-ui/core/components';
-import { views } from 'src/core';
+import ExtensionsManager from 'src/extensions/ExtensionsManager';
 import { Splitter } from 'src/components/Splitter';
 import useEffectEvent from 'src/hooks/useEffectEvent';
 import useStoredSidebarWidth from 'src/components/ResizableSidebar/useStoredSidebarWidth';
@@ -96,7 +96,10 @@ const AppLayout: React.FC = ({ children }) => {
       setRightWidth(possibleRightWidth);
     }
   };
-  const viewItems = views.getViews(ViewLocations.sqllab.rightSidebar) || [];
+  const contributions =
+    ExtensionsManager.getInstance().getViewContributions(
+      ViewLocations.sqllab.rightSidebar,
+    ) || [];
 
   return (
     <StyledContainer>
@@ -125,7 +128,7 @@ const AppLayout: React.FC = ({ children }) => {
           </StyledSidebar>
         </Splitter.Panel>
         <Splitter.Panel className="sqllab-body">{children}</Splitter.Panel>
-        {viewItems.length > 0 && (
+        {contributions.length > 0 && (
           <Splitter.Panel
             collapsible={{
               start: true,

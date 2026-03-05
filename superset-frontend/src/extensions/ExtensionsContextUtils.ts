@@ -16,6 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { ExtensionsContextType } from './ExtensionsContext';
 
-export { default as ComponentIndex } from './ComponentIndex';
-export * from './types';
+let extensionsContextValue: ExtensionsContextType | null = null;
+
+export const setExtensionsContextValue = (value: ExtensionsContextType) => {
+  extensionsContextValue = value;
+};
+
+export const getExtensionsContextValue = () => {
+  if (!extensionsContextValue) {
+    throw new Error('ExtensionsContext value is not set');
+  }
+  return extensionsContextValue;
+};

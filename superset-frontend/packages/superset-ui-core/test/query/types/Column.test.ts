@@ -18,7 +18,6 @@
  */
 import {
   isAdhocColumn,
-  isAdhocColumnReference,
   isPhysicalColumn,
   isQueryFormColumn,
 } from '@superset-ui/core';
@@ -61,17 +60,4 @@ test('isQueryFormColumn returns true', () => {
 
 test('isQueryFormColumn returns false', () => {
   expect(isQueryFormColumn({})).toEqual(false);
-});
-
-test('isAdhocColumnReference returns true for adhoc column with isColumnReference', () => {
-  const ref = { ...adhocColumn, isColumnReference: true };
-  expect(isAdhocColumnReference(ref)).toEqual(true);
-});
-
-test('isAdhocColumnReference returns false for non-reference adhoc column', () => {
-  expect(isAdhocColumnReference(adhocColumn)).toEqual(false);
-});
-
-test('isAdhocColumnReference returns false for non-adhoc column', () => {
-  expect(isAdhocColumnReference('gender')).toEqual(false);
 });

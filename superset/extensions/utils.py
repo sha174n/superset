@@ -241,6 +241,7 @@ def build_extension_data(extension: LoadedExtension) -> dict[str, Any]:
     }
     if manifest.frontend:
         frontend = manifest.frontend
+        module_federation = frontend.moduleFederation
         remote_entry_url = (
             f"/api/v1/extensions/{manifest.publisher}/"
             f"{manifest.name}/{frontend.remoteEntry}"
@@ -248,7 +249,9 @@ def build_extension_data(extension: LoadedExtension) -> dict[str, Any]:
         extension_data.update(
             {
                 "remoteEntry": remote_entry_url,
-                "moduleFederationName": frontend.moduleFederationName,
+                "exposedModules": module_federation.exposes,
+                "moduleFederationName": module_federation.name,
+                "contributions": frontend.contributions.model_dump(),
             }
         )
     return extension_data

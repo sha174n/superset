@@ -95,6 +95,7 @@ from superset.jinja_context import (
 from superset.models.annotations import Annotation
 from superset.models.core import Database
 from superset.models.helpers import (
+    validate_rls_clause,
     AuditMixinNullable,
     CertificationMixin,
     ExploreMixin,
@@ -755,8 +756,13 @@ class BaseDatasource(
         filter_groups: dict[Union[int, str], list[TextClause]] = defaultdict(list)
         try:
             for filter_ in security_manager.get_rls_filters(self):
+                clause_text = template_processor.process_template(filter_.clause)
+                validate_rls_clause(
+                    clause_text,
+                    engine=self.database.backend,
+                )
                 clause = self.text(
-                    f"({template_processor.process_template(filter_.clause)})"
+                    f"({clause_text})"
                 )
                 if filter_.group_key:
                     filter_groups[filter_.group_key].append(clause)
@@ -765,8 +771,13 @@ class BaseDatasource(
 
             if is_feature_enabled("EMBEDDED_SUPERSET"):
                 for rule in security_manager.get_guest_rls_filters(self):
+                    clause_text = template_processor.process_template(rule["clause"])
+                    validate_rls_clause(
+                        clause_text,
+                        engine=self.database.backend,
+                    )
                     clause = self.text(
-                        f"({template_processor.process_template(rule['clause'])})"
+                        f"({clause_text})"
                     )
                     all_filters.append(clause)
 

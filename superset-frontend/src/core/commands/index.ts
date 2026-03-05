@@ -20,32 +20,22 @@ import { logging } from '@apache-superset/core';
 import { commands as commandsApi } from '@apache-superset/core';
 import { Disposable } from '../models';
 
-type Command = commandsApi.Command;
-
-const commandsMap: Map<string, Command> = new Map();
-
 const commandRegistry: Map<string, (...args: any[]) => any> = new Map();
 
 const registerCommand: typeof commandsApi.registerCommand = (
-  command: Command,
-  callback: (...args: any[]) => any,
-  thisArg?: any,
-): Disposable => {
-  const { id } = command;
-
-  if (commandRegistry.has(id)) {
+  command,
+  callback,
+  thisArg,
+) => {
+  if (commandRegistry.has(command)) {
     logging.warn(
-      `Command "${id}" is already registered. Overwriting the existing command.`,
+      `Command "${command}" is already registered. Overwriting the existing command.`,
     );
   }
-
-  commandsMap.set(id, command);
   const boundCallback = thisArg ? callback.bind(thisArg) : callback;
-  commandRegistry.set(id, boundCallback);
-
+  commandRegistry.set(command, boundCallback);
   return new Disposable(() => {
-    commandsMap.delete(id);
-    commandRegistry.delete(id);
+    commandRegistry.delete(command);
   });
 };
 
@@ -60,21 +50,15 @@ const executeCommand: typeof commandsApi.executeCommand = async <T>(
   return callback(...args) as T;
 };
 
-const getCommands: typeof commandsApi.getCommands = (): Command[] =>
-  Array.from(commandsMap.values());
-
-const getCommand: typeof commandsApi.getCommand = (
-  id: string,
-): Command | undefined => commandsMap.get(id);
-
-export const resetContributions = (): void => {
-  commandsMap.clear();
-  commandRegistry.clear();
+const getCommands: typeof commandsApi.getCommands = filterInternal => {
+  const commands = Array.from(commandRegistry.keys());
+  return Promise.resolve(
+    filterInternal ? commands.filter(cmd => !cmd.startsWith('_')) : commands,
+  );
 };
 
 export const commands: typeof commandsApi = {
   registerCommand,
   executeCommand,
   getCommands,
-  getCommand,
 };

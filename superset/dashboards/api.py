@@ -912,9 +912,9 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
     @safe
     @statsd_metrics
     @event_logger.log_this_with_context(
-        action=lambda self, *args, **kwargs: (
-            f"{self.__class__.__name__}.put_chart_customizations"
-        ),
+        action=lambda self,
+        *args,
+        **kwargs: f"{self.__class__.__name__}.put_chart_customizations",
         log_to_statsd=False,
     )
     @requires_json
@@ -1261,9 +1261,8 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
     @permission_name("export")
     @statsd_metrics
     @event_logger.log_this_with_context(
-        action=lambda self, *args, **kwargs: (
-            f"{self.__class__.__name__}.export_as_example"
-        ),
+        action=lambda self, *args, **kwargs: f"{self.__class__.__name__}"
+        f".export_as_example",
         log_to_statsd=False,
     )
     def export_as_example(self, pk: int) -> Response:
@@ -1353,9 +1352,8 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
     @safe
     @statsd_metrics
     @event_logger.log_this_with_context(
-        action=lambda self, *args, **kwargs: (
-            f"{self.__class__.__name__}.cache_dashboard_screenshot"
-        ),
+        action=lambda self, *args, **kwargs: f"{self.__class__.__name__}"
+        f".cache_dashboard_screenshot",
         log_to_statsd=False,
     )
     def cache_dashboard_screenshot(self, pk: int, **kwargs: Any) -> WerkzeugResponse:
@@ -1672,7 +1670,7 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
         except ScreenshotImageNotAvailableException:
             return self.response_404()
         except Exception as ex:  # pylint: disable=broad-except
-            logger.warning(
+            logger.error(
                 "Error retrieving thumbnail for dashboard %s: %s",
                 str(dashboard.id),
                 str(ex),
@@ -1691,9 +1689,8 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
     @statsd_metrics
     @rison(get_fav_star_ids_schema)
     @event_logger.log_this_with_context(
-        action=lambda self, *args, **kwargs: (
-            f"{self.__class__.__name__}.favorite_status"
-        ),
+        action=lambda self, *args, **kwargs: f"{self.__class__.__name__}"
+        f".favorite_status",
         log_to_statsd=False,
     )
     def favorite_status(self, **kwargs: Any) -> Response:
@@ -1786,9 +1783,8 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
     @safe
     @statsd_metrics
     @event_logger.log_this_with_context(
-        action=lambda self, *args, **kwargs: (
-            f"{self.__class__.__name__}.remove_favorite"
-        ),
+        action=lambda self, *args, **kwargs: f"{self.__class__.__name__}"
+        f".remove_favorite",
         log_to_statsd=False,
     )
     def remove_favorite(self, pk: int) -> Response:
@@ -2085,9 +2081,9 @@ class DashboardRestApi(CustomTagsOptimizationMixin, BaseSupersetModelRestApi):
     @permission_name("set_embedded")
     @statsd_metrics
     @event_logger.log_this_with_context(
-        action=lambda self, *args, **kwargs: (
-            f"{self.__class__.__name__}.delete_embedded"
-        ),
+        action=lambda self,
+        *args,
+        **kwargs: f"{self.__class__.__name__}.delete_embedded",
         log_to_statsd=False,
     )
     @with_dashboard

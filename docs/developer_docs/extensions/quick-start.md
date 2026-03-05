@@ -95,7 +95,7 @@ my-org.hello-world/
 
 ## Step 3: Configure Extension Metadata
 
-The generated `extension.json` contains the extension's metadata. It is used to identify the extension and declare its backend entry points. Frontend contributions are registered directly in code (see Step 5).
+The generated `extension.json` contains basic metadata. Update it to register your panel in SQL Lab:
 
 ```json
 {
@@ -104,6 +104,24 @@ The generated `extension.json` contains the extension's metadata. It is used to 
   "displayName": "Hello World",
   "version": "0.1.0",
   "license": "Apache-2.0",
+  "frontend": {
+    "contributions": {
+      "views": {
+        "sqllab": {
+          "panels": [
+            {
+              "id": "my-org.hello-world.main",
+              "name": "Hello World"
+            }
+          ]
+        }
+      }
+    },
+    "moduleFederation": {
+      "exposes": ["./index"],
+      "name": "myOrg_helloWorld"
+    }
+  },
   "backend": {
     "entryPoints": ["superset_extensions.my_org.hello_world.entrypoint"],
     "files": ["backend/src/superset_extensions/my_org/hello_world/**/*.py"]
@@ -112,13 +130,15 @@ The generated `extension.json` contains the extension's metadata. It is used to 
 }
 ```
 
+**Note**: The `moduleFederation.name` uses collision-safe naming (`myOrg_helloWorld`), and backend entry points use the full nested Python namespace (`superset_extensions.my_org.hello_world`).
+
 **Key fields:**
 
 - `publisher`: Organizational namespace for the extension
 - `name`: Technical identifier (kebab-case)
 - `displayName`: Human-readable name shown to users
-- `backend.entryPoints`: Python modules to load eagerly when the extension starts
-- `backend.files`: Glob patterns for Python source files to include in the bundle
+- `frontend.contributions.views.sqllab.panels`: Registers your panel in SQL Lab
+- `backend.entryPoints`: Python modules to load eagerly when extension starts
 
 ## Step 4: Create Backend API
 
@@ -227,9 +247,7 @@ The `@apache-superset/core` package must be listed in both `peerDependencies` (t
 
 **`frontend/webpack.config.js`**
 
-The webpack configuration requires specific settings for Module Federation. Key settings include `externalsType: "window"` and `externals` to map `@apache-superset/core` to `window.superset` at runtime, `import: false` for shared modules to use the host's React instead of bundling a separate copy, and `remoteEntry.[contenthash].js` for cache busting.
-
-**Convention**: Superset always loads extensions by requesting the `./index` module from the Module Federation container. The `exposes` entry must be exactly `'./index': './src/index.tsx'` — do not rename or add additional entries. All API registrations must be reachable from that file. See [Architecture](./architecture#module-federation) for a full explanation.
+The webpack configuration requires specific settings for Module Federation. Key settings include `externalsType: "window"` and `externals` to map `@apache-superset/core` to `window.superset` at runtime, `import: false` for shared modules to use the host's React instead of bundling a separate copy, and `remoteEntry.[contenthash].js` for cache busting:
 
 ```javascript
 const path = require("path");
@@ -395,26 +413,29 @@ export default HelloWorldPanel;
 
 **Update `frontend/src/index.tsx`**
 
-This file is the single entry point Superset loads from every extension. All registrations — views, commands, menus, editors, event listeners — must be made here (or imported and executed from here). Replace the generated code with:
+Replace the generated code with the extension entry point:
 
 ```tsx
 import React from 'react';
-import { views } from '@apache-superset/core';
+import { core } from '@apache-superset/core';
 import HelloWorldPanel from './HelloWorldPanel';
 
-views.registerView(
-  { id: 'my-org.hello-world.main', name: 'Hello World' },
-  'sqllab.panels',
-  () => <HelloWorldPanel />,
-);
+export const activate = (context: core.ExtensionContext) => {
+  context.disposables.push(
+    core.registerViewProvider('my-org.hello-world.main', () => <HelloWorldPanel />),
+  );
+};
+
+export const deactivate = () => {};
 ```
 
 **Key patterns:**
 
-- `views.registerView` is called at module load time — no `activate`/`deactivate` lifecycle needed
-- The first argument is a `{ id, name }` descriptor; the second is the contribution area (e.g., `sqllab.panels`); the third is a factory returning the React component
-- `authentication.getCSRFToken()` retrieves the CSRF token for API calls (used inside components)
+- `activate` function is called when the extension loads
+- `core.registerViewProvider` registers the component with ID `my-org.hello-world.main` (matching `extension.json`)
+- `authentication.getCSRFToken()` retrieves the CSRF token for API calls
 - Fetch calls to `/extensions/{publisher}/{name}/{endpoint}` reach your backend API
+- `context.disposables.push()` ensures proper cleanup
 
 ## Step 6: Install Dependencies
 
@@ -492,15 +513,15 @@ Superset will extract and validate the extension metadata, load the assets, regi
 
 Here's what happens when your extension loads:
 
-1. **Superset starts**: Reads `extension.json` and loads the backend entrypoint
+1. **Superset starts**: Reads `extension.json` and loads backend entrypoint
 2. **Backend registration**: `entrypoint.py` registers your API via `rest_api.add_extension_api()`
 3. **Frontend loads**: When SQL Lab opens, Superset fetches the remote entry file
-4. **Module Federation**: Webpack loads your extension module and resolves `@apache-superset/core` to `window.superset`
-5. **Registration**: The module executes at load time, calling `views.registerView` to register your panel
+4. **Module Federation**: Webpack loads your extension code and resolves `@apache-superset/core` to `window.superset`
+5. **Activation**: `activate()` is called, registering your view provider
 6. **Rendering**: When the user opens your panel, React renders `<HelloWorldPanel />`
-7. **API call**: The component fetches data from `/extensions/my-org/hello-world/message`
+7. **API call**: Component fetches data from `/extensions/my-org/hello-world/message`
 8. **Backend response**: Your Flask API returns the hello world message
-9. **Display**: The component shows the message to the user
+9. **Display**: Component shows the message to the user
 
 ## Next Steps
 

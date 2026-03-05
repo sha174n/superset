@@ -58,7 +58,6 @@ import {
   Refs,
 } from '../types';
 import { parseAxisBound } from '../utils/controls';
-import { safeParseEChartOptions } from '../utils/safeEChartOptionsParser';
 import {
   dedupSeries,
   extractDataTotalValues,
@@ -100,7 +99,6 @@ import {
   getYAxisFormatter,
 } from '../utils/formatters';
 import { getMetricDisplayName } from '../utils/metricDisplayName';
-import { mergeCustomEChartOptions } from '../utils/mergeCustomEChartOptions';
 
 const getFormatter = (
   customFormatters: Record<string, ValueFormatter>,
@@ -124,7 +122,7 @@ export default function transformProps(
   const {
     width,
     height,
-    formData: { echartOptions: _echartOptions, ...formData },
+    formData,
     queriesData,
     hooks,
     filterState,
@@ -805,25 +803,11 @@ export default function transformProps(
     focusedSeries = seriesName;
   };
 
-  let customEchartOptions;
-  try {
-    // Parse custom EChart options safely using AST analysis
-    // This replaces the unsafe `new Function()` approach with a secure parser
-    // that only allows static data structures (no function callbacks)
-    customEchartOptions = safeParseEChartOptions(_echartOptions);
-  } catch (_) {
-    customEchartOptions = undefined;
-  }
-
-  const mergedEchartOptions = customEchartOptions
-    ? mergeCustomEChartOptions(echartOptions, customEchartOptions)
-    : echartOptions;
-
   return {
     formData,
     width,
     height,
-    echartOptions: mergedEchartOptions,
+    echartOptions,
     setDataMask,
     emitCrossFilters,
     labelMap,

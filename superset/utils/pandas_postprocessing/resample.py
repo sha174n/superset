@@ -54,5 +54,5 @@ def resample(
     else:
         _df = getattr(df.resample(rule), method)()
         if method in ("ffill", "bfill"):
-            _df = getattr(_df, method)()
+            _df = _df.fillna(method=method)
     return _df

@@ -181,31 +181,6 @@ export function optimizeBarLabelPlacement(
   return (series.data as TimeseriesDataRecord[]).map(transformValue);
 }
 
-export function applyColorByPrimaryAxis(
-  series: SeriesOption,
-  colorScale: CategoricalColorScale,
-  sliceId: number | undefined,
-  opacity: number,
-  isHorizontal = false,
-): {
-  value: [string | number, number];
-  itemStyle: { color: string; opacity: number; borderWidth: number };
-}[] {
-  return (series.data as [string | number, number][]).map(value => {
-    // For horizontal charts the primary axis is index 1 (category), not index 0 (numeric)
-    const colorKey = String(isHorizontal ? value[1] : value[0]);
-
-    return {
-      value,
-      itemStyle: {
-        color: colorScale(colorKey, sliceId),
-        opacity,
-        borderWidth: 0,
-      },
-    };
-  });
-}
-
 export function transformSeries(
   series: SeriesOption,
   colorScale: CategoricalColorScale,
@@ -239,7 +214,6 @@ export function transformSeries(
     timeShiftColor?: boolean;
     theme?: SupersetTheme;
     hasDimensions?: boolean;
-    colorByPrimaryAxis?: boolean;
   },
 ): SeriesOption | undefined {
   const { name, data } = series;
@@ -270,7 +244,6 @@ export function transformSeries(
     timeCompare = [],
     timeShiftColor,
     theme,
-    colorByPrimaryAxis = false,
   } = opts;
   const contexts = seriesContexts[name || ''] || [];
   const hasForecast =
@@ -376,27 +349,17 @@ export function transformSeries(
 
   return {
     ...series,
-    ...(Array.isArray(data)
-      ? colorByPrimaryAxis
-        ? {
-            data: applyColorByPrimaryAxis(
-              series,
-              colorScale,
-              sliceId,
-              opacity,
-              isHorizontal,
-            ),
-          }
-        : seriesType === 'bar' && !stack
-          ? { data: optimizeBarLabelPlacement(series, isHorizontal) }
-          : null
+    ...(Array.isArray(data) && seriesType === 'bar'
+      ? {
+          data: optimizeBarLabelPlacement(series, isHorizontal),
+        }
       : null),
     connectNulls,
     queryIndex,
     yAxisIndex,
     name: forecastSeries.name,
-    ...(colorByPrimaryAxis ? {} : { itemStyle }),
-    // @ts-ignore
+    itemStyle,
+    // @ts-expect-error
     type: plotType,
     smooth: seriesType === 'smooth',
     triggerLineEvent: true,

@@ -33,14 +33,12 @@ const supersetTextDocs = getDatabaseDocumentationLinks();
 
 export const DOCUMENTATION_LINK = supersetTextDocs
   ? supersetTextDocs.support
-  : 'https://superset.apache.org/user-docs/databases/#installing-database-drivers';
+  : 'https://superset.apache.org/docs/configuration/databases#installing-database-drivers';
 
 const irregularDocumentationLinks = {
   postgresql: 'https://superset.apache.org',
-  mssql:
-    'https://superset.apache.org/user-docs/databases/supported/microsoft-sql-server',
-  gsheets:
-    'https://superset.apache.org/user-docs/databases/supported/google-sheets',
+  mssql: 'https://superset.apache.org/docs/databases/sql-server',
+  gsheets: 'https://superset.apache.org/docs/databases/google-sheets',
 };
 
 const documentationLink = (engine: string | undefined) => {

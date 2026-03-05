@@ -17,12 +17,11 @@
  * under the License.
  */
 
-import { isMatrixifyEnabled, MatrixifyGridRenderer } from './matrixify.mocks';
-
-test('isMatrixifyEnabled mock returns false by default', () => {
-  expect(isMatrixifyEnabled()).toBe(false);
+// Minimal service worker for PWA file handling support
+self.addEventListener('install', event => {
+  event.waitUntil(self.skipWaiting());
 });
 
-test('MatrixifyGridRenderer mock returns null by default', () => {
-  expect(MatrixifyGridRenderer()).toBeNull();
+self.addEventListener('activate', event => {
+  event.waitUntil(self.clients.claim());
 });

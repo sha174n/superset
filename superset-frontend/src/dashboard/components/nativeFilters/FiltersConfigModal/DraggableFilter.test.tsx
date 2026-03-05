@@ -17,230 +17,213 @@
  * under the License.
  */
 import { render } from 'spec/helpers/testing-library';
-import {
-  DndContext,
-  PointerSensor,
-  useSensor,
-  closestCenter,
-} from '@dnd-kit/core';
-import {
-  verticalListSortingStrategy,
-  SortableContext,
-} from '@dnd-kit/sortable';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 import {
   DraggableFilter,
   FILTER_TYPE,
   CUSTOMIZATION_TYPE,
 } from './DraggableFilter';
 
-const DndWrapper: React.FC<{
-  children: React.ReactElement;
-  items: string[];
-}> = ({ children, items }) => {
-  const sensor = useSensor(PointerSensor, {
-    activationConstraint: { distance: 10 },
-  });
-
-  return (
-    <DndContext sensors={[sensor]} collisionDetection={closestCenter}>
-      <SortableContext items={items} strategy={verticalListSortingStrategy}>
-        {children}
-      </SortableContext>
-    </DndContext>
-  );
-};
-
-const renderWithDnd = (component: React.ReactElement, items: string[] = []) =>
-  render(<DndWrapper items={items}>{component}</DndWrapper>);
+const renderWithDnd = (component: React.ReactElement) =>
+  render(<DndProvider backend={HTML5Backend}>{component}</DndProvider>);
 
 test('identifies divider items correctly', () => {
+  const onRearrange = jest.fn();
   const filterIds = ['NATIVE_FILTER_DIVIDER-abc123'];
 
   const { container } = renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
       dragType={FILTER_TYPE}
     >
       <div>Divider Content</div>
     </DraggableFilter>,
-    filterIds,
   );
 
   expect(container).toBeInTheDocument();
 });
 
 test('identifies non-divider items correctly', () => {
+  const onRearrange = jest.fn();
   const filterIds = ['NATIVE_FILTER-abc123'];
 
   const { container } = renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
       dragType={FILTER_TYPE}
     >
       <div>Filter Content</div>
     </DraggableFilter>,
-    filterIds,
   );
 
   expect(container).toBeInTheDocument();
 });
 
-test('renders divider item for cross-list drop target', () => {
+test('calls onCrossListDrop when divider is dropped cross-list from filter to customization', () => {
+  const onRearrange = jest.fn();
+  const onCrossListDrop = jest.fn();
   const filterIds = ['NATIVE_FILTER_DIVIDER-abc123'];
 
-  const { container } = renderWithDnd(
+  renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
+      onCrossListDrop={onCrossListDrop}
       dragType={CUSTOMIZATION_TYPE}
     >
       <div>Drop Target</div>
     </DraggableFilter>,
-    filterIds,
   );
 
-  expect(container).toBeInTheDocument();
+  expect(onCrossListDrop).not.toHaveBeenCalled();
 });
 
-test('renders customization divider for cross-list drop target', () => {
+test('calls onCrossListDrop when divider is dropped cross-list from customization to filter', () => {
+  const onRearrange = jest.fn();
+  const onCrossListDrop = jest.fn();
   const filterIds = ['CHART_CUSTOMIZATION_DIVIDER-xyz789'];
 
-  const { container } = renderWithDnd(
+  renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
+      onCrossListDrop={onCrossListDrop}
       dragType={FILTER_TYPE}
     >
       <div>Drop Target</div>
     </DraggableFilter>,
-    filterIds,
   );
 
-  expect(container).toBeInTheDocument();
+  expect(onCrossListDrop).not.toHaveBeenCalled();
 });
 
-test('renders filter item for same-list drops', () => {
+test('calls onRearrange for same-list drops', () => {
+  const onRearrange = jest.fn();
   const filterIds = ['NATIVE_FILTER-abc123'];
 
-  const { container } = renderWithDnd(
+  renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
       dragType={FILTER_TYPE}
     >
       <div>Filter Content</div>
     </DraggableFilter>,
-    filterIds,
   );
 
-  expect(container).toBeInTheDocument();
+  expect(onRearrange).not.toHaveBeenCalled();
 });
 
-test('renders non-divider item for cross-list drop target', () => {
+test('does not call onCrossListDrop when non-divider is dropped cross-list', () => {
+  const onRearrange = jest.fn();
+  const onCrossListDrop = jest.fn();
   const filterIds = ['NATIVE_FILTER-abc123'];
 
-  const { container } = renderWithDnd(
+  renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
+      onCrossListDrop={onCrossListDrop}
       dragType={CUSTOMIZATION_TYPE}
     >
       <div>Drop Target</div>
     </DraggableFilter>,
-    filterIds,
   );
 
-  expect(container).toBeInTheDocument();
+  expect(onCrossListDrop).not.toHaveBeenCalled();
 });
 
 test('renders children correctly', () => {
+  const onRearrange = jest.fn();
   const filterIds = ['NATIVE_FILTER-abc123'];
 
   const { getByText } = renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
       dragType={FILTER_TYPE}
     >
       <div>Test Content</div>
     </DraggableFilter>,
-    filterIds,
   );
 
   expect(getByText('Test Content')).toBeInTheDocument();
 });
 
 test('accepts both FILTER_TYPE and CUSTOMIZATION_TYPE drops', () => {
+  const onRearrange = jest.fn();
   const filterIds = ['NATIVE_FILTER-abc123'];
 
   const { container } = renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
       dragType={FILTER_TYPE}
     >
       <div>Drop Zone</div>
     </DraggableFilter>,
-    filterIds,
   );
 
   expect(container).toBeInTheDocument();
 });
 
 test('uses FILTER_TYPE as default dragType', () => {
+  const onRearrange = jest.fn();
   const filterIds = ['NATIVE_FILTER-abc123'];
 
   const { container } = renderWithDnd(
-    <DraggableFilter id={filterIds[0]} index={0} filterIds={filterIds}>
+    <DraggableFilter index={0} filterIds={filterIds} onRearrange={onRearrange}>
       <div>Default Type</div>
     </DraggableFilter>,
-    filterIds,
   );
 
   expect(container).toBeInTheDocument();
 });
 
 test('detects cross-list drop correctly', () => {
+  const onRearrange = jest.fn();
+  const onCrossListDrop = jest.fn();
   const filterIds = ['NATIVE_FILTER_DIVIDER-abc123'];
 
   const { container } = renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
+      onCrossListDrop={onCrossListDrop}
       dragType={CUSTOMIZATION_TYPE}
     >
       <div>Cross List Target</div>
     </DraggableFilter>,
-    filterIds,
   );
 
   expect(container).toBeInTheDocument();
 });
 
 test('identifies chart customization divider with underscore prefix', () => {
+  const onRearrange = jest.fn();
   const filterIds = ['CHART_CUSTOMIZATION_DIVIDER-abc123'];
 
   const { container } = renderWithDnd(
     <DraggableFilter
-      id={filterIds[0]}
       index={0}
       filterIds={filterIds}
+      onRearrange={onRearrange}
       dragType={CUSTOMIZATION_TYPE}
     >
       <div>Customization Divider</div>
     </DraggableFilter>,
-    filterIds,
   );
 
   expect(container).toBeInTheDocument();

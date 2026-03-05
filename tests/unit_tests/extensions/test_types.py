@@ -20,10 +20,13 @@
 import pytest
 from pydantic import ValidationError
 from superset_core.extensions.types import (
+    ContributionConfig,
     ExtensionConfig,
     ExtensionConfigBackend,
+    ExtensionConfigFrontend,
     Manifest,
     ManifestBackend,
+    ModuleFederationConfig,
 )
 
 # =============================================================================
@@ -46,6 +49,7 @@ def test_extension_config_minimal():
     assert config.version == "0.0.0"
     assert config.dependencies == []
     assert config.permissions == []
+    assert config.frontend is None
     assert config.backend is None
 
 
@@ -61,7 +65,23 @@ def test_extension_config_full():
             "description": "A query insights extension",
             "dependencies": ["other-extension"],
             "permissions": ["can_read", "can_view"],
+            "frontend": {
+                "contributions": {
+                    "views": {
+                        "sqllab": {
+                            "panels": [
+                                {
+                                    "id": "query_insights.main",
+                                    "name": "Query Insights",
+                                }
+                            ]
+                        }
+                    }
+                },
+                "moduleFederation": {"exposes": ["./index"]},
+            },
             "backend": {
+                "entryPoints": ["query_insights.entrypoint"],
                 "files": ["backend/src/query_insights/**/*.py"],
             },
         }
@@ -74,7 +94,10 @@ def test_extension_config_full():
     assert config.description == "A query insights extension"
     assert config.dependencies == ["other-extension"]
     assert config.permissions == ["can_read", "can_view"]
+    assert config.frontend is not None
+    assert config.frontend.moduleFederation.exposes == ["./index"]
     assert config.backend is not None
+    assert config.backend.entryPoints == ["query_insights.entrypoint"]
     assert config.backend.files == ["backend/src/query_insights/**/*.py"]
 
 
@@ -178,7 +201,7 @@ def test_manifest_minimal():
 
 
 def test_manifest_with_frontend():
-    """Test Manifest frontend section requires remoteEntry and moduleFederationName."""
+    """Test Manifest with frontend section requires remoteEntry."""
     manifest = Manifest.model_validate(
         {
             "id": "my-org.my-extension",
@@ -187,13 +210,14 @@ def test_manifest_with_frontend():
             "displayName": "My Extension",
             "frontend": {
                 "remoteEntry": "remoteEntry.abc123.js",
-                "moduleFederationName": "myOrg_myExtension",
+                "contributions": {},
+                "moduleFederation": {"exposes": ["./index"]},
             },
         }
     )
     assert manifest.frontend is not None
     assert manifest.frontend.remoteEntry == "remoteEntry.abc123.js"
-    assert manifest.frontend.moduleFederationName == "myOrg_myExtension"
+    assert manifest.frontend.moduleFederation.exposes == ["./index"]
 
 
 def test_manifest_frontend_missing_remote_entry():
@@ -205,7 +229,7 @@ def test_manifest_frontend_missing_remote_entry():
                 "publisher": "my-org",
                 "name": "my-extension",
                 "displayName": "My Extension",
-                "frontend": {"moduleFederationName": "myOrg_myExtension"},
+                "frontend": {"contributions": {}, "moduleFederation": {}},
             }
         )
     assert "remoteEntry" in str(exc_info.value)
@@ -219,16 +243,11 @@ def test_manifest_with_backend():
             "publisher": "my-org",
             "name": "my-extension",
             "displayName": "My Extension",
-            "backend": {
-                "entrypoint": "superset_extensions.my_org.my_extension.entrypoint"
-            },
+            "backend": {"entryPoints": ["my_extension.entrypoint"]},
         }
     )
     assert manifest.backend is not None
-    assert (
-        manifest.backend.entrypoint
-        == "superset_extensions.my_org.my_extension.entrypoint"
-    )
+    assert manifest.backend.entryPoints == ["my_extension.entrypoint"]
 
 
 def test_manifest_backend_no_files_field():
@@ -239,32 +258,50 @@ def test_manifest_backend_no_files_field():
             "publisher": "my-org",
             "name": "my-extension",
             "displayName": "My Extension",
-            "backend": {
-                "entrypoint": "superset_extensions.my_org.my_extension.entrypoint"
-            },
+            "backend": {"entryPoints": ["my_extension.entrypoint"]},
         }
     )
     # ManifestBackend should not have a 'files' field
     assert not hasattr(manifest.backend, "files")
 
 
+# =============================================================================
+# Shared component tests
+# =============================================================================
+
+
+def test_module_federation_config_defaults():
+    """Test ModuleFederationConfig has correct defaults."""
+    config = ModuleFederationConfig.model_validate({})
+    assert config.exposes == []
+    assert config.filename == "remoteEntry.js"
+    assert config.shared == {}
+    assert config.remotes == {}
+
+
+def test_contribution_config_defaults():
+    """Test ContributionConfig has correct defaults."""
+    config = ContributionConfig.model_validate({})
+    assert config.commands == []
+    assert config.views == {}
+    assert config.menus == {}
+
+
+def test_extension_config_frontend_defaults():
+    """Test ExtensionConfigFrontend has correct defaults."""
+    frontend = ExtensionConfigFrontend.model_validate({})
+    assert frontend.contributions.commands == []
+    assert frontend.moduleFederation.exposes == []
+
+
 def test_extension_config_backend_defaults():
     """Test ExtensionConfigBackend has correct defaults."""
     backend = ExtensionConfigBackend.model_validate({})
+    assert backend.entryPoints == []
     assert backend.files == []
 
 
-def test_manifest_backend_required_entrypoint():
-    """Test ManifestBackend requires entrypoint field."""
-    # Test positive case - entrypoint provided
-    backend = ManifestBackend.model_validate(
-        {"entrypoint": "superset_extensions.test_org.test_extension.entrypoint"}
-    )
-    assert (
-        backend.entrypoint == "superset_extensions.test_org.test_extension.entrypoint"
-    )
-
-    # Test negative case - entrypoint missing should raise ValidationError
-    with pytest.raises(ValidationError) as exc_info:
-        ManifestBackend.model_validate({})
-    assert "entrypoint" in str(exc_info.value)
+def test_manifest_backend_defaults():
+    """Test ManifestBackend has correct defaults."""
+    backend = ManifestBackend.model_validate({})
+    assert backend.entryPoints == []

@@ -75,36 +75,35 @@ const App = () => (
     <ScrollToTop />
     <LocationPathnameLogger />
     <RootContextProviders>
+      <ExtensionsStartup />
       <Menu
         data={bootstrapData.common.menu_data}
         isFrontendRoute={isFrontendRoute}
       />
-      <ExtensionsStartup>
-        <Switch>
-          {routes.map(({ path, Component, props = {}, Fallback = Loading }) => (
-            <Route path={path} key={path}>
-              <Suspense fallback={<Fallback />}>
-                <Layout>
-                  <Layout.Content
+      <Switch>
+        {routes.map(({ path, Component, props = {}, Fallback = Loading }) => (
+          <Route path={path} key={path}>
+            <Suspense fallback={<Fallback />}>
+              <Layout>
+                <Layout.Content
+                  css={css`
+                    display: flex;
+                    flex-direction: column;
+                  `}
+                >
+                  <ErrorBoundary
                     css={css`
-                      display: flex;
-                      flex-direction: column;
+                      margin: 16px;
                     `}
                   >
-                    <ErrorBoundary
-                      css={css`
-                        margin: 16px;
-                      `}
-                    >
-                      <Component user={bootstrapData.user} {...props} />
-                    </ErrorBoundary>
-                  </Layout.Content>
-                </Layout>
-              </Suspense>
-            </Route>
-          ))}
-        </Switch>
-      </ExtensionsStartup>
+                    <Component user={bootstrapData.user} {...props} />
+                  </ErrorBoundary>
+                </Layout.Content>
+              </Layout>
+            </Suspense>
+          </Route>
+        ))}
+      </Switch>
       <ToastContainer />
     </RootContextProviders>
   </Router>

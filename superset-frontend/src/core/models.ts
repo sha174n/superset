@@ -107,3 +107,7 @@ export class Disposable implements coreType.Disposable {
     this.dispose();
   }
 }
+
+export class ExtensionContext implements coreType.ExtensionContext {
+  disposables: coreType.Disposable[] = [];
+}

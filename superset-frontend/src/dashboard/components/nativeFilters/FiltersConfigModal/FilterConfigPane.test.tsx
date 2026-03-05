@@ -19,6 +19,7 @@
 import { dashboardLayout } from 'spec/fixtures/mockDashboardLayout';
 import { buildNativeFilter } from 'spec/fixtures/mockNativeFilters';
 import {
+  fireEvent,
   render,
   screen,
   userEvent,
@@ -66,17 +67,22 @@ beforeEach(() => {
   scrollMock.mockClear();
 });
 
-test('drag and drop', () => {
+test('drag and drop', async () => {
   defaultRender();
-  const dragIcons = document.querySelectorAll('[alt="Move icon"]');
-  expect(dragIcons.length).toBe(3);
-
-  expect(screen.getByText('NATIVE_FILTER-1')).toBeInTheDocument();
-  expect(screen.getByText('NATIVE_FILTER-2')).toBeInTheDocument();
-  expect(screen.getByText('NATIVE_FILTER-3')).toBeInTheDocument();
-
-  const filterContainer = screen.getByTestId('filter-title-container');
-  expect(filterContainer).toBeInTheDocument();
+  // Drag the state and country filter above the product filter
+  const [countryStateFilter, productFilter] = document.querySelectorAll(
+    'div[draggable=true]',
+  );
+  // const productFilter = await screen.findByText('NATIVE_FILTER-3');
+  await waitFor(() => {
+    fireEvent.dragStart(productFilter);
+    fireEvent.dragEnter(countryStateFilter);
+    fireEvent.dragOver(countryStateFilter);
+    fireEvent.drop(countryStateFilter);
+    fireEvent.dragLeave(countryStateFilter);
+    fireEvent.dragEnd(productFilter);
+  });
+  expect(defaultProps.onRearrange).toHaveBeenCalledTimes(1);
 });
 
 test('remove filter', async () => {

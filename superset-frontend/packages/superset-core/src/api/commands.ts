@@ -28,40 +28,19 @@
 import { Disposable } from './core';
 
 /**
- * Describes a command that can be contributed to the application.
- */
-export interface Command {
-  /** The unique identifier for the command. */
-  id: string;
-  /** The display title of the command. */
-  title: string;
-  /** The icon associated with the command. */
-  icon?: string;
-  /** A description of what the command does. */
-  description: string;
-}
-
-/**
- * Registers a command with its handler as a module-level side effect.
+ * Registers a command that can be invoked via a keyboard shortcut,
+ * a menu item, an action, or directly.
  *
  * Registering a command with an existing command identifier twice
- * will cause a warning and overwrite the existing command.
+ * will cause an error.
  *
- * @param command The command descriptor.
+ * @param command A unique identifier for the command.
  * @param callback A command handler function.
  * @param thisArg The `this` context used when invoking the handler function.
  * @returns Disposable which unregisters this command on disposal.
- *
- * @example
- * ```typescript
- * commands.registerCommand(
- *   { id: 'sqllab_parquet.export', title: 'Export to Parquet', icon: 'FileOutlined', description: 'Export results to Parquet format' },
- *   async () => { exportToParquet(); },
- * );
- * ```
  */
 export declare function registerCommand(
-  command: Command,
+  command: string,
   callback: (...args: any[]) => any,
   thisArg?: any,
 ): Disposable;
@@ -80,16 +59,12 @@ export declare function executeCommand<T = unknown>(
 ): Promise<T>;
 
 /**
- * Retrieve all registered commands.
+ * Retrieve the list of all available commands. Commands starting with an underscore are
+ * treated as internal commands.
  *
- * @returns An array of Command objects for all registered commands.
+ * @param filterInternal Set `true` to not see internal commands (starting with an underscore)
+ * @returns Promise that resolves to a list of command ids.
  */
-export declare function getCommands(): Command[];
-
-/**
- * Retrieve a specific command.
- *
- * @param id The command identifier to look up.
- * @returns The Command or undefined if not found.
- */
-export declare function getCommand(id: string): Command | undefined;
+export declare function getCommands(
+  filterInternal?: boolean,
+): Promise<string[]>;

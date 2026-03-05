@@ -91,45 +91,39 @@ The `README.md` file provides documentation and instructions for using the exten
 
 ## Extension Metadata
 
-The `extension.json` file contains the metadata necessary for the host application to identify and load the extension. Extensions follow a **convention-over-configuration** approach where entry points and build configuration are determined by standardized file locations rather than explicit declarations.
+The `extension.json` file contains all metadata necessary for the host application to understand and manage the extension:
 
 ```json
 {
-  "publisher": "my-org",
-  "name": "dataset-references",
-  "displayName": "Dataset References",
+  "id": "dataset-references",
+  "name": "Dataset References",
   "version": "1.0.0",
-  "license": "Apache-2.0",
-  "permissions": []
+  "frontend": {
+    "contributions": {
+      "views": {
+        "sqllab": {
+          "panels": [
+            {
+              "id": "dataset-references.main",
+              "name": "Dataset References"
+            }
+          ]
+        }
+      }
+    },
+    "moduleFederation": {
+      "exposes": ["./index"],
+      "name": "datasetReferences"
+    }
+  },
+  "backend": {
+    "entryPoints": ["superset_extensions.dataset_references.entrypoint"],
+    "files": ["backend/src/superset_extensions/dataset_references/**/*.py"]
+  }
 }
 ```
 
-### Convention-Based Entry Points
-
-Extensions use standardized entry point locations:
-
-- **Backend**: `backend/src/superset_extensions/{publisher}/{name}/entrypoint.py`
-- **Frontend**: `frontend/src/index.tsx`
-
-### Build Configuration
-
-Backend build configuration is specified in `backend/pyproject.toml`:
-
-```toml
-[project]
-name = "my_org-dataset_references"
-version = "1.0.0"
-license = "Apache-2.0"
-
-[tool.apache_superset_extensions.build]
-# Files to include in the extension build/bundle
-include = [
-    "src/superset_extensions/my_org/dataset_references/**/*.py",
-]
-exclude = []
-```
-
-The `include` patterns specify which files to bundle, while `exclude` patterns can filter out unwanted files (e.g., test files, cache directories).
+The `contributions` section declares how the extension extends Superset's functionality through views, commands, menus, and other contribution types. The `backend` section specifies entry points and files to include in the bundle.
 
 ## Interacting with the Host
 
@@ -160,38 +154,34 @@ export const onDidQueryStop: Event<QueryContext>;
 The following code demonstrates more examples of the existing frontend APIs:
 
 ```typescript
-import React from 'react';
-import { views, commands, sqlLab, authentication, Button } from '@apache-superset/core';
+import { core, commands, sqlLab, authentication, Button } from '@apache-superset/core';
 import MyPanel from './MyPanel';
 
-// Register a new panel (view) in SQL Lab and use shared UI components in your extension's React code
-views.registerView(
-  { id: 'my-extension.panel', name: 'My Panel' },
-  'sqllab.panels',
-  () => <MyPanel><Button /></MyPanel>,
-);
+export function activate(context) {
+  // Register a new panel (view) in SQL Lab and use shared UI components in your extension's React code
+  const panelDisposable = core.registerView('my_extension.panel', <MyPanel><Button/></MyPanel>);
 
-// Register a custom command
-commands.registerCommand(
-  {
-    id: 'my-extension.copy-query',
-    title: 'Copy Query',
-    description: 'Copy the current query to clipboard',
-  },
-  () => {
-    // Command logic here
-  },
-);
+  // Register a custom command
+  const commandDisposable = commands.registerCommand(
+    'my_extension.copy_query',
+    () => {
+      // Command logic here
+    },
+  );
 
-// Listen for query run events in SQL Lab
-sqlLab.onDidQueryRun(queryContext => {
-  console.log('Query started on database:', queryContext.tab.databaseId);
-});
+  // Listen for query run events in SQL Lab
+  const eventDisposable = sqlLab.onDidQueryRun(queryContext => {
+    console.log('Query started on database:', queryContext.tab.databaseId);
+  });
 
-// Access a CSRF token for secure API requests
-authentication.getCSRFToken().then(token => {
-  // Use token as needed
-});
+  // Access a CSRF token for secure API requests
+  authentication.getCSRFToken().then(token => {
+    // Use token as needed
+  });
+
+  // Add all disposables for automatic cleanup on deactivation
+  context.subscriptions.push(panelDisposable, commandDisposable, eventDisposable);
+}
 ```
 
 ### Backend APIs
@@ -309,7 +299,7 @@ InteractiveMyComponent.argTypes = {
 
 When the docs site is built (`yarn start` or `yarn build` in the `docs/` directory):
 
-1. The `generate-superset-components` script scans all stories (including `superset-core`)
+1. The `generate-extension-components` script scans all stories in `superset-core`
 2. For each story, it generates an MDX page with:
    - Component description
    - **Live interactive example** with controls extracted from `argTypes`

@@ -223,11 +223,33 @@ def test_extension_json_content_is_correct(
     # Load and verify more complex nested structures
     content = load_json_file(extension_json_path)
 
-    # Verify frontend section is not present (contributions are code-first)
-    assert "frontend" not in content
+    # Verify frontend section exists and has correct structure
+    assert "frontend" in content
+    frontend = content["frontend"]
+    assert "contributions" in frontend
+    assert "moduleFederation" in frontend
+    assert frontend["contributions"] == {
+        "commands": [],
+        "views": {},
+        "menus": {},
+        "editors": [],
+    }
+    assert frontend["moduleFederation"] == {
+        "exposes": ["./index"],
+        "name": "testOrg_testExtension",
+    }
 
-    # Verify no backend section in extension.json (moved to pyproject.toml)
-    assert "backend" not in content
+    # Verify backend section exists and has correct structure
+    assert "backend" in content
+    backend = content["backend"]
+    assert "entryPoints" in backend
+    assert "files" in backend
+    assert backend["entryPoints"] == [
+        "superset_extensions.test_org.test_extension.entrypoint"
+    ]
+    assert backend["files"] == [
+        "backend/src/superset_extensions/test_org/test_extension/**/*.py"
+    ]
 
 
 @pytest.mark.cli
