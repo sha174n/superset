@@ -95,13 +95,13 @@ from superset.jinja_context import (
 from superset.models.annotations import Annotation
 from superset.models.core import Database
 from superset.models.helpers import (
-    validate_rls_clause,
     AuditMixinNullable,
     CertificationMixin,
     ExploreMixin,
     ImportExportMixin,
     QueryResult,
     SQLA_QUERY_KEYS,
+    validate_rls_clause,
 )
 from superset.models.slice import Slice
 from superset.models.sql_types.base import CurrencyType
@@ -761,9 +761,7 @@ class BaseDatasource(
                     clause_text,
                     engine=self.database.backend,
                 )
-                clause = self.text(
-                    f"({clause_text})"
-                )
+                clause = self.text(f"({clause_text})")
                 if filter_.group_key:
                     filter_groups[filter_.group_key].append(clause)
                 else:
@@ -776,9 +774,7 @@ class BaseDatasource(
                         clause_text,
                         engine=self.database.backend,
                     )
-                    clause = self.text(
-                        f"({clause_text})"
-                    )
+                    clause = self.text(f"({clause_text})")
                     all_filters.append(clause)
 
             grouped_filters = [or_(*clauses) for clauses in filter_groups.values()]
@@ -1354,7 +1350,7 @@ class SqlaTable(
         name = escape(self.name)
         url = escape(self.explore_url)
         anchor = f'<a target="_blank" href="{url}">{name}</a>'
-        return Markup(anchor)
+        return Markup(anchor)  # noqa: S704
 
     def get_catalog_perm(self) -> str | None:
         """Returns catalog permission if present, database one otherwise."""
