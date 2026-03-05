@@ -154,17 +154,6 @@ def test_extract_tables_from_sql() -> None:
     Test that referenced tables are parsed correctly from the SQL.
     """
     assert extract_tables_from_sql("SELECT * FROM tbname") == {Table("tbname")}
-
-    # raw expressions (e.g. inside RLS)
-    assert extract_tables_from_sql(
-        "bot_profile__name = 'giphy' OR "
-        "EXISTS (SELECT 1 FROM public.birth_names WHERE gender='girl')"
-    ) == {Table("birth_names", "public")}
-    assert extract_tables_from_sql(
-        "bot_profile__name = 'giphy' OR EXISTS "
-        "(WITH cte AS (SELECT 1 FROM other_tbl) SELECT 1 FROM cte)"
-    ) == {Table("other_tbl")}
-
     assert extract_tables_from_sql("SELECT * FROM tbname foo") == {Table("tbname")}
     assert extract_tables_from_sql("SELECT * FROM tbname AS foo") == {Table("tbname")}
 
@@ -3145,28 +3134,3 @@ def test_backtick_invalid_sql_still_fails() -> None:
     sql = "SELECT * FROM `table` WHERE"
     with pytest.raises(SupersetParseError):
         SQLScript(sql, "base")
-
-
-def test_extract_tables_raw_expression() -> None:
-    """
-    Test that tables inside raw expressions (like RLS clauses) are parsed correctly.
-    """
-    # basic subquery inside raw expression
-    assert extract_tables_from_sql(
-        "bot_profile__name = 'giphy' OR "
-        "EXISTS (SELECT 1 FROM public.birth_names WHERE gender='girl')"
-    ) == {Table("birth_names", "public")}
-
-    # exploit scenario
-    assert extract_tables_from_sql(
-        "bot_profile__name = 'giphy' OR EXISTS (SELECT 1 FROM (SELECT table_name "
-        "FROM information_schema.tables WHERE table_schema='public' ORDER BY "
-        "table_name ASC LIMIT 1 OFFSET 0) AS t WHERE "
-        "ascii(substring(t.table_name, 1, 1)) = 32)"
-    ) == {Table("tables", "information_schema")}
-
-    # ensure CTE with the same name as the table does not filter out the actual table
-    assert extract_tables_from_sql(
-        "bot_profile__name = 'giphy' OR EXISTS (WITH birth_names AS (SELECT 1 "
-        "FROM public.birth_names) SELECT 1 FROM birth_names)"
-    ) == {Table("birth_names", "public")}

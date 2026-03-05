@@ -1372,7 +1372,7 @@ class SQLScript:
         return len(self.statements) == 1 and self.statements[0].is_select()
 
 
-def extract_tables_from_statement(  # noqa: C901
+def extract_tables_from_statement(
     statement: exp.Expression,
     dialect: Dialects | None,
 ) -> set[Table]:
@@ -1406,42 +1406,12 @@ def extract_tables_from_statement(  # noqa: C901
             return set()
         sources = pseudo_query.find_all(exp.Table)
     else:
-        scopes = list(traverse_scope(statement))
-        sources_list = [
+        sources = [
             source
-            for scope in scopes
+            for scope in traverse_scope(statement)
             for source in scope.sources.values()
             if isinstance(source, exp.Table) and not is_cte(source, scope)
         ]
-
-        if not scopes:
-            # If traverse_scope returns nothing (e.g. for a raw expression),
-            # we find all subquery nodes and traverse them individually.
-            # This ensures we correctly resolve CTEs within their actual scopes.
-            for node_type in (exp.Select, exp.Union, exp.Subquery):
-                for subquery in statement.find_all(node_type):
-                    for scope in traverse_scope(subquery):
-                        for source in scope.sources.values():
-                            if isinstance(source, exp.Table) and not is_cte(
-                                source, scope
-                            ):
-                                sources_list.append(source)
-
-            # Extract any remaining tables outside the subqueries we traversed.
-            # Covers simple cases like `table.column = 1` without scopes.
-
-            subquery_nodes = list(
-                statement.find_all(exp.Select, exp.Union, exp.Subquery)
-            )
-            for source in statement.find_all(exp.Table):
-                # Only add if it's not inside one of the subqueries we already processed
-                if not any(
-                    source.parent is node or source in node.walk()
-                    for node in subquery_nodes
-                ):
-                    sources_list.append(source)
-
-        sources = sources_list
 
     return {
         Table(
