@@ -3134,3 +3134,43 @@ def test_backtick_invalid_sql_still_fails() -> None:
     sql = "SELECT * FROM `table` WHERE"
     with pytest.raises(SupersetParseError):
         SQLScript(sql, "base")
+
+
+def test_validate_rls_clause() -> None:
+    from superset.exceptions import SupersetSecurityException
+    from superset.models.helpers import validate_rls_clause
+
+    # Valid clauses
+    validate_rls_clause("department_id = 1", "postgresql")
+    validate_rls_clause("status = 'active'", "postgresql")
+    validate_rls_clause("created_at > '2023-01-01'", "postgresql")
+    validate_rls_clause("user_id = current_user_id()", "postgresql")
+
+    # Invalid clauses with subqueries
+    with pytest.raises(SupersetSecurityException) as excinfo:
+        validate_rls_clause(
+            "department_id IN (SELECT id FROM departments)", "postgresql"
+        )
+    assert "Row level security filters cannot contain sub-queries." in str(
+        excinfo.value
+    )
+
+    with pytest.raises(SupersetSecurityException) as excinfo:
+        validate_rls_clause(
+            "EXISTS (SELECT 1 FROM roles WHERE user_id = id)", "postgresql"
+        )
+    assert "Row level security filters cannot contain sub-queries." in str(
+        excinfo.value
+    )
+
+    from superset.exceptions import SupersetParseError
+
+    # Invalid clauses with multiple statements
+    with pytest.raises(SupersetParseError) as excinfo_parse:
+        validate_rls_clause(
+            "status = 'active'; UPDATE users SET role = 'admin';", "postgresql"
+        )
+    assert "SQLStatement should have exactly one statement" in str(excinfo_parse.value)
+
+    with pytest.raises(SupersetParseError):
+        validate_rls_clause("NOT A VALID SQL CLAUSE!!", "postgresql")

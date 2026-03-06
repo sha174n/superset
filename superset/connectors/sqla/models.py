@@ -101,6 +101,7 @@ from superset.models.helpers import (
     ImportExportMixin,
     QueryResult,
     SQLA_QUERY_KEYS,
+    validate_rls_clause,
 )
 from superset.models.slice import Slice
 from superset.models.sql_types.base import CurrencyType
@@ -755,9 +756,12 @@ class BaseDatasource(
         filter_groups: dict[Union[int, str], list[TextClause]] = defaultdict(list)
         try:
             for filter_ in security_manager.get_rls_filters(self):
-                clause = self.text(
-                    f"({template_processor.process_template(filter_.clause)})"
+                clause_text = template_processor.process_template(filter_.clause)
+                validate_rls_clause(
+                    clause_text,
+                    engine=self.database.backend,
                 )
+                clause = self.text(f"({clause_text})")
                 if filter_.group_key:
                     filter_groups[filter_.group_key].append(clause)
                 else:
@@ -765,9 +769,12 @@ class BaseDatasource(
 
             if is_feature_enabled("EMBEDDED_SUPERSET"):
                 for rule in security_manager.get_guest_rls_filters(self):
-                    clause = self.text(
-                        f"({template_processor.process_template(rule['clause'])})"
+                    clause_text = template_processor.process_template(rule["clause"])
+                    validate_rls_clause(
+                        clause_text,
+                        engine=self.database.backend,
                     )
+                    clause = self.text(f"({clause_text})")
                     all_filters.append(clause)
 
             grouped_filters = [or_(*clauses) for clauses in filter_groups.values()]
@@ -1343,7 +1350,7 @@ class SqlaTable(
         name = escape(self.name)
         url = escape(self.explore_url)
         anchor = f'<a target="_blank" href="{url}">{name}</a>'
-        return Markup(anchor)
+        return Markup(anchor)  # noqa: S704
 
     def get_catalog_perm(self) -> str | None:
         """Returns catalog permission if present, database one otherwise."""
