@@ -501,3 +501,31 @@ class TestSqlLabApi(SupersetTestCase):
         assert data == expected_data, f"CSV data mismatch. Got: {data}"
         db.session.delete(query_obj)
         db.session.commit()
+
+    def test_execute_sql_query_too_long(self):
+        self.login(ADMIN_USERNAME)
+        db_id = get_example_database().id
+        large_sql = "SELECT " + ",".join([f"'{i}'" for i in range(100000)])
+        data = {
+            "database_id": db_id,
+            "sql": large_sql,
+            "client_id": "test_client_id",
+        }
+        resp = self.client.post("/api/v1/sqllab/execute/", json=data)
+        assert resp.status_code == 400
+        data = json.loads(resp.data.decode("utf-8"))
+        assert "sql" in data["message"]
+        assert "too long" in data["message"]["sql"][0]
+
+    def test_format_sql_query_too_long(self):
+        self.login(ADMIN_USERNAME)
+        large_sql = "SELECT " + ",".join([f"'{i}'" for i in range(100000)])
+        data = {
+            "sql": large_sql,
+            "engine": "postgresql",
+        }
+        resp = self.client.post("/api/v1/sqllab/format_sql/", json=data)
+        assert resp.status_code == 400
+        data = json.loads(resp.data.decode("utf-8"))
+        assert "sql" in data["message"]
+        assert "too long" in data["message"]["sql"][0]
