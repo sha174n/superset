@@ -52,6 +52,23 @@ def _get_owner_id(tab_state_id: int) -> int:
 
 
 class TabStateView(BaseSupersetView):
+    # These are the fields that are allowed to be updated via the PUT endpoint
+    # to prevent mass assignment vulnerabilities.
+    ALLOWED_UPDATE_FIELDS = {
+        "label",
+        "active",
+        "database_id",
+        "catalog",
+        "schema",
+        "sql",
+        "query_limit",
+        "latest_query_id",
+        "autorun",
+        "template_params",
+        "hide_left_bar",
+        "saved_query_id",
+    }
+
     @has_access_api
     @expose("/", methods=("POST",))
     def post(self) -> FlaskResponse:
@@ -153,7 +170,11 @@ class TabStateView(BaseSupersetView):
             return Response(status=403)
 
         try:
-            fields = {k: json.loads(v) for k, v in request.form.to_dict().items()}
+            fields = {
+                k: json.loads(v)
+                for k, v in request.form.to_dict().items()
+                if k in self.ALLOWED_UPDATE_FIELDS
+            }
             db.session.query(TabState).filter_by(id=tab_state_id).update(fields)
             db.session.commit()
             return json_success(json.dumps(tab_state_id))

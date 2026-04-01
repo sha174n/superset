@@ -37,7 +37,7 @@ from superset.utils.database import (
     get_example_database,
 )  # noqa: F401
 from superset.utils import core as utils, json
-from superset.models.sql_lab import Query
+from superset.models.sql_lab import Query, TabState
 
 from tests.integration_tests.base_tests import SupersetTestCase
 from tests.integration_tests.constants import (
@@ -188,6 +188,43 @@ class TestSqlLabApi(SupersetTestCase):
         assert resp.status_code == 200
         resp = self.client.delete("/tabstateview/" + str(tab_state_id))
         assert resp.status_code == 404
+
+    @pytest.mark.usefixtures("create_gamma_sqllab_no_data")
+    @mock.patch.dict(
+        "superset.extensions.feature_flag_manager._feature_flags",
+        {"SQLLAB_BACKEND_PERSISTENCE": True},
+        clear=True,
+    )
+    def test_put_tab_state_mass_assignment(self):
+        self.login(GAMMA_SQLLAB_NO_DATA_USERNAME)
+
+        # create a tab
+        data = {
+            "queryEditor": json.dumps(
+                {
+                    "title": "Untitled Query 1",
+                    "dbId": 1,
+                    "schema": None,
+                    "autorun": False,
+                    "sql": "SELECT ...",
+                    "queryLimit": 1000,
+                }
+            )
+        }
+        resp = self.get_json_resp("/tabstateview/", data=data)
+        tab_state_id = resp["id"]
+
+        tab_state = db.session.query(TabState).filter_by(id=tab_state_id).one()
+        initial_user_id = tab_state.user_id
+
+        # Attempt to update user_id via PUT (mass assignment)
+        # We'll try to change it to another user id.
+        attacker_data = {"user_id": json.dumps(initial_user_id + 1)}
+        self.client.put(f"/tabstateview/{tab_state_id}", data=attacker_data)
+
+        db.session.expire_all()
+        tab_state = db.session.query(TabState).filter_by(id=tab_state_id).one()
+        assert tab_state.user_id == initial_user_id
 
     def test_get_access_denied(self):
         new_role = Role(name="Dummy Role", permissions=[])
