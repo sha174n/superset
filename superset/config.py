@@ -1342,6 +1342,9 @@ SQLLAB_SCHEDULE_WARNING_MESSAGE = None
 # Max payload size (MB) for SQL Lab to prevent browser hangs with large results.
 SQLLAB_PAYLOAD_MAX_MB = None
 
+# Max SQL query length (bytes) to prevent resource exhaustion during parsing.
+SQLLAB_MAX_SQL_LENGTH = 1024 * 1024
+
 # Force refresh while auto-refresh in dashboard
 DASHBOARD_AUTO_REFRESH_MODE: Literal["fetch", "force"] = "force"
 # Dashboard auto refresh intervals

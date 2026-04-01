@@ -14,9 +14,18 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from marshmallow import fields, Schema
+from marshmallow import fields, Schema, ValidationError
 
 from superset.databases.schemas import ImportV1DatabaseSchema
+
+
+def validate_sql_length(value: str) -> None:
+    from flask import current_app
+
+    max_len = current_app.config.get("SQLLAB_MAX_SQL_LENGTH")
+    if max_len and len(value) > max_len:
+        raise ValidationError(f"SQL query is too long (max {max_len} bytes)")
+
 
 sql_lab_get_results_schema = {
     "type": "object",
@@ -32,7 +41,9 @@ class EstimateQueryCostSchema(Schema):
         required=True, metadata={"description": "The database id"}
     )
     sql = fields.String(
-        required=True, metadata={"description": "The SQL query to estimate"}
+        required=True,
+        validate=validate_sql_length,
+        metadata={"description": "The SQL query to estimate"},
     )
     template_params = fields.Dict(
         keys=fields.String(), metadata={"description": "The SQL query template params"}
@@ -46,7 +57,7 @@ class EstimateQueryCostSchema(Schema):
 
 
 class FormatQueryPayloadSchema(Schema):
-    sql = fields.String(required=True)
+    sql = fields.String(required=True, validate=validate_sql_length)
     engine = fields.String(required=False, allow_none=True)
     database_id = fields.Integer(
         required=False, allow_none=True, metadata={"description": "The database id"}
@@ -60,7 +71,7 @@ class FormatQueryPayloadSchema(Schema):
 
 class ExecutePayloadSchema(Schema):
     database_id = fields.Integer(required=True)
-    sql = fields.String(required=True)
+    sql = fields.String(required=True, validate=validate_sql_length)
     client_id = fields.String(allow_none=True)
     queryLimit = fields.Integer(allow_none=True)  # noqa: N815
     sql_editor_id = fields.String(allow_none=True)
