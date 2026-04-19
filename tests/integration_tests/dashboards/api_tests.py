@@ -328,11 +328,11 @@ class TestDashboardApi(ApiOwnersTestCaseMixin, InsertChartMixin, SupersetTestCas
 
     @pytest.mark.usefixtures("load_world_bank_dashboard_with_slices")
     @patch("superset.utils.log.logger")
-    @patch("superset.daos.dashboard.DashboardDAO.get_datasets_for_dashboard")
+    @patch("superset.daos.dashboard.DashboardDAO.get_by_id_or_slug")
     def test_get_dashboard_datasets_invalid_schema(
-        self, dashboard_datasets_mock, logger_mock
+        self, dashboard_get_mock, logger_mock
     ):
-        dashboard_datasets_mock.side_effect = TypeError("Invalid schema")
+        dashboard_get_mock.side_effect = TypeError("Invalid schema")
         self.login(ADMIN_USERNAME)
         uri = "api/v1/dashboard/world_health/datasets"
         response = self.get_assert_metric(uri, "get_datasets")
