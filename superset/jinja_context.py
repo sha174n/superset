@@ -285,12 +285,16 @@ class ExtraCache:
         # pylint: disable=import-outside-toplevel
         from superset.views.utils import get_form_data
 
-        if has_request_context() and request.args.get(param):
-            return request.args.get(param, default)
+        result = (
+            request.args.get(param, default)
+            if has_request_context() and request.args.get(param)
+            else None
+        )
+        if result is None:
+            form_data, _ = get_form_data()
+            url_params = form_data.get("url_params") or {}
+            result = url_params.get(param, default)
 
-        form_data, _ = get_form_data()
-        url_params = form_data.get("url_params") or {}
-        result = url_params.get(param, default)
         if result and escape_result and self.dialect:
             # use the dialect specific quoting logic to escape string
             result = String().literal_processor(dialect=self.dialect)(value=result)[
@@ -301,7 +305,11 @@ class ExtraCache:
         return result
 
     def filter_values(
-        self, column: str, default: str | None = None, remove_filter: bool = False
+        self,
+        column: str,
+        default: str | None = None,
+        remove_filter: bool = False,
+        escape_result: bool = True,
     ) -> list[Any]:
         """Gets a values for a particular filter as a list
 
@@ -324,84 +332,63 @@ class ExtraCache:
         :param remove_filter: When set to true, mark the filter as processed,
             removing it from the outer query. Useful when a filter should
             only apply to the inner query
+        :param escape_result: Should special characters in the result be escaped
         :return: returns a list of filter values
         """
         return_val: list[Any] = []
-        filters = self.get_filters(column, remove_filter)
-        for flt in filters:
-            val = flt.get("val")
-            if isinstance(val, list):
-                return_val.extend(val)
-            elif val:
-                return_val.append(val)
+        # pylint: disable=import-outside-toplevel
+        from superset.views.utils import get_form_data
+
+        form_data, _ = get_form_data()
+        convert_legacy_filters_into_adhoc(form_data)
+        merge_extra_filters(form_data)
+
+        for flt in form_data.get("adhoc_filters", []):
+            val: Union[Any, list[Any]] = flt.get("comparator")
+            if (
+                flt.get("expressionType") == "SIMPLE"
+                and flt.get("clause") == "WHERE"
+                and flt.get("subject") == column
+                and val
+            ):
+                if remove_filter:
+                    if column not in self.removed_filters:
+                        self.removed_filters.append(column)
+                if column not in self.applied_filters:
+                    self.applied_filters.append(column)
+
+                if isinstance(val, list):
+                    return_val.extend(val)
+                else:
+                    return_val.append(val)
 
         if (not return_val) and default:
-            # If no values are found, return the default provided.
             return_val = [default]
+
+        if escape_result and self.dialect:
+            processor = String().literal_processor(dialect=self.dialect)
+            return_val = [processor(value=v)[1:-1] for v in return_val]
 
         return return_val
 
-    def get_filters(self, column: str, remove_filter: bool = False) -> list[Filter]:
+    def get_filters(
+        self, column: str, remove_filter: bool = False, escape_result: bool = True
+    ) -> list[Filter]:
         """Get the filters applied to the given column. In addition
            to returning values like the filter_values function
            the get_filters function returns the operator specified in the explorer UI.
 
         This is useful if:
-            - you want to handle more than the IN operator in your SQL clause
-            - you want to handle generating custom SQL conditions for a filter
+            - you want to use a filter component to filter a query where the name of
+             filter component column doesn't match the one in the select statement
             - you want to have the ability for filter inside the main query for speed
             purposes
-
-        Usage example::
-
-
-            WITH RECURSIVE
-                superiors(employee_id, manager_id, full_name, level, lineage) AS (
-                SELECT
-                    employee_id,
-                    manager_id,
-                    full_name,
-                1 as level,
-                employee_id as lineage
-                FROM
-                    employees
-                WHERE
-                1=1
-                {# Render a blank line #}
-                {%- for filter in get_filters('full_name', remove_filter=True) -%}
-                {%- if filter.get('op') == 'IN' -%}
-                    AND
-                    full_name IN {{ filter.get('val')|where_in }}
-                {%- endif -%}
-                {%- if filter.get('op') == 'LIKE' -%}
-                    AND
-                    full_name LIKE '{{ filter.get('val') | replace("'", "''") }}'
-                {%- endif -%}
-                {%- endfor -%}
-                UNION ALL
-                    SELECT
-                        e.employee_id,
-                        e.manager_id,
-                        e.full_name,
-                s.level + 1 as level,
-                s.lineage
-                    FROM
-                        employees e,
-                    superiors s
-                    WHERE s.manager_id = e.employee_id
-            )
-
-
-            SELECT
-                employee_id, manager_id, full_name, level, lineage
-            FROM
-                superiors
-            order by lineage, level
 
         :param column: column/filter name to lookup
         :param remove_filter: When set to true, mark the filter as processed,
             removing it from the outer query. Useful when a filter should
             only apply to the inner query
+        :param escape_result: Should special characters in the result be escaped
         :return: returns a list of filters
         """
         # pylint: disable=import-outside-toplevel
@@ -441,6 +428,16 @@ class ExtraCache:
                     FilterOperator.NOT_IN,
                 ) and not isinstance(val, list):
                     val = [val]
+
+                if escape_result and self.dialect:
+                    processor = String().literal_processor(dialect=self.dialect)
+                    if isinstance(val, list):
+                        val = [
+                            processor(value=v)[1:-1] if isinstance(v, str) else v
+                            for v in val
+                        ]
+                    elif isinstance(val, str):
+                        val = processor(value=val)[1:-1]
 
                 filters.append({"op": op, "col": column, "val": val})
 
