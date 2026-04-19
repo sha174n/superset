@@ -413,6 +413,8 @@ class StarRocksEngineSpec(MySQLEngineSpec):
             username = database.get_effective_user(database.url_object)
 
             if username:
-                return [f'EXECUTE AS "{username}" WITH NO REVERT;']
+                return [
+                    f"EXECUTE AS {database.quote_identifier(username)} WITH NO REVERT;"
+                ]
 
         return []

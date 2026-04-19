@@ -165,8 +165,31 @@ def test_impersonation_username(mocker: MockerFixture) -> None:
         engine_kwargs={},
     ) == (make_url("starrocks://service_user@localhost:9030/hive.default"), {})
 
+    database.quote_identifier = lambda x: f'"{x}"'
     assert StarRocksEngineSpec.get_prequeries(database) == [
         'EXECUTE AS "alice" WITH NO REVERT;'
+    ]
+
+
+def test_impersonation_injection(mocker: MockerFixture) -> None:
+    """
+    Test that impersonation handles injection attacks.
+    """
+    from superset.db_engine_specs.starrocks import StarRocksEngineSpec
+
+    database = mocker.MagicMock()
+    database.impersonate_user = True
+    database.get_effective_user.return_value = 'alice" WITH NO REVERT; DROP TABLE foo; --'
+
+    # Mock quote_identifier behavior to mimic StarRocks quoting (double quotes, escape double quotes)
+    def quote_identifier(s: str) -> str:
+        escaped = s.replace('"', '""')
+        return f'"{escaped}"'
+
+    database.quote_identifier = quote_identifier
+
+    assert StarRocksEngineSpec.get_prequeries(database) == [
+        'EXECUTE AS "alice"" WITH NO REVERT; DROP TABLE foo; --" WITH NO REVERT;'
     ]
 
 

@@ -144,9 +144,31 @@ def test_get_prequeries(mocker: MockerFixture) -> None:
     Test the ``get_prequeries`` method.
     """
     database = mocker.MagicMock()
+    database.quote_identifier = lambda x: f'"{x}"'
 
     assert spec.get_prequeries(database) == []
     assert spec.get_prequeries(database, schema="test") == ['set search_path = "test"']
+
+
+def test_get_prequeries_injection(mocker: MockerFixture) -> None:
+    """
+    Test the ``get_prequeries`` method with injection payload.
+    """
+    database = mocker.MagicMock()
+
+    # Mock quote_identifier behavior to mimic Postgres quoting (double quotes, escape double quotes)
+    def quote_identifier(s: str) -> str:
+        escaped = s.replace('"', '""')
+        return f'"{escaped}"'
+
+    database.quote_identifier = quote_identifier
+
+    schema = 'public"; SELECT pg_sleep(5); --'
+
+    prequeries = spec.get_prequeries(database, schema=schema)
+
+    # Expect the schema to be quoted, neutralizing the injection
+    assert prequeries == ['set search_path = "public""; SELECT pg_sleep(5); --"']
 
 
 def test_get_default_schema_for_query(mocker: MockerFixture) -> None:
