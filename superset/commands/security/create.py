@@ -27,6 +27,7 @@ from superset.connectors.sqla.models import SqlaTable
 from superset.daos.security import RLSDAO
 from superset.extensions import db
 from superset.utils.decorators import transaction
+from superset.utils.rls import validate_rls_clause
 
 logger = logging.getLogger(__name__)
 
@@ -54,3 +55,4 @@ class CreateRLSRuleCommand(BaseCommand):
         raise_for_datasource_access(tables)
         self._properties["roles"] = roles
         self._properties["tables"] = tables
+        validate_rls_clause(self._properties["clause"])
