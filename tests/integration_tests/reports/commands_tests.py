@@ -1270,8 +1270,6 @@ def test_csv_report_query_context_backfill_allows_non_chart_editor_executor(
 
     query_context = json.dumps({"mock": "query_context"})
     with override_user(security_manager.find_user(username)):
-        # The executor is not an editor of the chart, which is what makes this
-        # the regression-prone case.
         assert not security_manager.is_editor(chart)
         UpdateChartCommand(
             chart.id,

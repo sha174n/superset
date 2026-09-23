@@ -545,6 +545,10 @@ class TestChartsUpdateCommand(SupersetTestCase):
             assert len(chart.editors) == 1
             assert user_is_editor(admin, chart)
         finally:
+            # Roll back first: a mid-transaction failure in the body would
+            # otherwise make the restore below raise ``PendingRollbackError``
+            # and mask it, leaving the shared row mutated.
+            db.session.rollback()
             chart = db.session.query(Slice).get(pk)
             chart.query_context = original_query_context
             chart.editors = original_editors
@@ -606,10 +610,14 @@ class TestChartsUpdateCommand(SupersetTestCase):
         dashboard = self.get_dash_by_slug("births")
         chart = dashboard.slices[0]
         original_query_context = chart.query_context
-        # Snapshot before ``upsert``, which returns the existing row when the
+        # Snapshot before ``upsert``, which reuses the existing row when the
         # dashboard is already embedded: only a row this test inserted may be
-        # deleted below.
+        # deleted below, and ``upsert`` overwrites the allowlist on one it
+        # reuses, so that has to be put back rather than dropped.
         dashboard_was_embedded = bool(dashboard.embedded)
+        original_allow_domain_list = (
+            dashboard.embedded[0].allow_domain_list if dashboard_was_embedded else None
+        )
         embedded = EmbeddedDashboardDAO.upsert(dashboard, [])
         db.session.flush()  # the uuid is only populated on flush
         embedded_uuid = embedded.uuid
@@ -653,10 +661,11 @@ class TestChartsUpdateCommand(SupersetTestCase):
             # the row this test created rather than leak it into later tests;
             # on the passing path the rollback already discarded it.
             db.session.rollback()
-            if not dashboard_was_embedded:
-                db.session.query(EmbeddedDashboard).filter_by(
-                    uuid=embedded_uuid
-                ).delete()
+            existing = db.session.query(EmbeddedDashboard).filter_by(uuid=embedded_uuid)
+            if dashboard_was_embedded:
+                existing.update({"allow_domain_list": original_allow_domain_list})
+            else:
+                existing.delete()
             chart.query_context = original_query_context
             db.session.commit()
 

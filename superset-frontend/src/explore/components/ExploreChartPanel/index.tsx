@@ -259,12 +259,8 @@ const ExploreChartPanel = ({
     updateQueryContext().catch(error => {
       // Best-effort backfill; the chart renders either way. A 403 is expected
       // (no write access, or a managed chart), so it stays at debug.
-      const message = 'Skipped background query context backfill';
-      if (error?.status === 403) {
-        logging.debug(message, error);
-      } else {
-        logging.warn(message, error);
-      }
+      const log = error?.status === 403 ? logging.debug : logging.warn;
+      log('Skipped background query context backfill', error);
     });
   }, [updateQueryContext]);
 
