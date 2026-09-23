@@ -657,9 +657,11 @@ class TestChartsUpdateCommand(SupersetTestCase):
                     UpdateChartCommand(chart.id, json_obj).run()
         finally:
             # Should the guest gate regress, ``run()`` commits before
-            # ``pytest.raises`` fails, and a rollback cannot undo a commit. Drop
-            # the row this test created rather than leak it into later tests;
-            # on the passing path the rollback already discarded it.
+            # ``pytest.raises`` fails, and a rollback cannot undo a commit. So
+            # undo the embedding explicitly rather than leak it into later
+            # tests: drop a row this test inserted, or put back the allowlist
+            # on one it reused. On the passing path the rollback already
+            # discarded both.
             db.session.rollback()
             existing = db.session.query(EmbeddedDashboard).filter_by(uuid=embedded_uuid)
             if dashboard_was_embedded:
